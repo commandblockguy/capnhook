@@ -70,7 +70,7 @@ main_executor_call_destination = $
 	ld	bc,(ix+15)
 	ld	de,(ix+12)
 	ld	iy,(ix+6)
-	ld	ix,(iy+21)
+	ld	ix,(ix+21)
 	ex	(sp),hl
 	ret
 main_executor_size = $-main_executor

@@ -77,7 +77,7 @@ hook_error_t refresh_hooks(void) {
     return HOOK_SUCCESS;
 }
 
-hook_error_t install_hook(uint24_t id, hook_t *hook, hook_type_t type, uint8_t priority, char *description) {
+hook_error_t install_hook(uint24_t id, hook_t *hook, hook_type_t type, uint8_t priority, const char *description) {
     if(type >= NUM_HOOK_TYPES) return HOOK_ERROR_UNKNOWN_TYPE;
     if(!user_hook_valid(hook)) return HOOK_ERROR_INVALID_USER_HOOK;
 
@@ -95,6 +95,7 @@ hook_error_t install_hook(uint24_t id, hook_t *hook, hook_type_t type, uint8_t p
     user_hook_entry_t *existing = get_entry_by_id(id, db);
     if(existing) {
         // Replace the existing entry
+        entry.priority = existing->priority;
         memcpy(existing, &entry, sizeof(entry));
     } else {
         // Write to the end of the file
