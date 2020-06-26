@@ -59,7 +59,7 @@ hook_error_t refresh_hooks(void) {
         hook_t *hooks[256];
         //todo: check if another hook is active, and if so add it as a minimum priority hook - guess that also means that I'll have to add a marker so that we don't add ourself as a minimum priority hook, which would be entertaining but detrimental to proper function
         for(user_hook_entry_t *entry = entries; entry < end; entry++) {
-            if(entry->type == type && user_hook_valid(entry->hook)) {
+            if(entry->type == type && user_hook_valid(entry->hook) && entry->enabled) {
                 hooks[number_hooks] = entry->hook;
                 number_hooks++;
                 if(number_hooks == 255) break;
