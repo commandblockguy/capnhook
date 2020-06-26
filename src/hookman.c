@@ -21,7 +21,7 @@ const database_header_t header = {
 
 typedef struct {
     uint24_t id;
-    hook_t *hook;				// pointer to the user hook
+    hook_t *hook;			// pointer to the user hook
     uint8_t type;			// enum for which OS hook to use
     uint8_t priority;		// process lowest priorities first
     bool enabled;
@@ -399,11 +399,10 @@ hook_error_t write_db(ti_var_t db) {
     size_t size = ti_GetSize(db);
 
     if(!ti_ArchiveHasRoom(size)) return HOOK_ERROR_NEEDS_GC;
-    ti_Delete(DB_NAME);
-    if(ti_Rename(DB_TEMP_NAME, DB_NAME)) return HOOK_ERROR_DATABASE_CORRUPTED;
     if(!ti_SetArchiveStatus(true, db)) return HOOK_ERROR_DATABASE_CORRUPTED;
-
+    ti_Delete(DB_NAME);
     ti_Close(db);
+    if(ti_Rename(DB_TEMP_NAME, DB_NAME)) return HOOK_ERROR_DATABASE_CORRUPTED;
 
     return refresh_hooks();
 }
