@@ -430,10 +430,11 @@ void *flash_relocate(void *data, size_t size) {
 void debug_print_db(void) {
     dbg_sprintf(dbgout, "----- DATABASE UPDATED -----\n");
     ti_var_t db = ti_Open(DB_NAME, "r");
+    void *ptr = ti_GetDataPtr(db);
     database_header_t header;
     ti_Read(&header, sizeof(header), 1, db);
     user_hook_entry_t current_entry;
-    dbg_sprintf(dbgout, "Size: %u | Version: %u | Entry size: %u\n", ti_GetSize(db), header.version, sizeof(current_entry));
+    dbg_sprintf(dbgout, "DB: %p | Size: %u | Version: %u | Entry size: %u\n", ptr, ti_GetSize(db), header.version, sizeof(current_entry));
     for(int i = 0; ti_Read(&current_entry, sizeof(current_entry), 1, db); i++) {
         dbg_sprintf(dbgout, "Entry %u: id: %06X | hook: %p | type: %2u | priority: %3u | enabled: %c | description: %s\n",
                 i, current_entry.id, current_entry.hook, current_entry.type, current_entry.priority, current_entry.enabled ? 'T' : 'F', current_entry.description);

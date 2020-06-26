@@ -1,0 +1,23 @@
+{
+  "rom": "/home/john/Documents/Calculator/ROMs/5.3.0.0037/5.0.0.0089.rom",
+  "transfer_files": [
+    "bin/DEMO.8xp"
+  ],
+  "target": {
+    "name": "DEMO",
+    "isASM": true
+  },
+  "sequence": [
+    "action|launch",
+    "hashWait|1",
+    "key|enter"
+  ],
+  "hashes": {
+    "1": {
+      "description": "Check the screen for the text \"PASS\"",
+      "start": "vram_start",
+      "size": "vram_16_size",
+      "expected_CRCs": [ "90C1EF72" ]
+    }
+  }
+}

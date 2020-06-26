@@ -54,15 +54,15 @@ _install_individual_executor:
 	pop	bc,bc
 
 	; temp - set breakpoint for individual executor
-	push	hl
-	pop	de
-	inc	de
-	scf
-	sbc    hl,hl
-	ld     (hl),3
-	push	de
-	pop	hl
-	dec	hl
+	;push	hl
+	;pop	de
+	;inc	de
+	;scf
+	;sbc    hl,hl
+	;ld     (hl),3
+	;push	de
+	;pop	hl
+	;dec	hl
 
 	ld	bc,(ix+6)
 	ld	ix,hook_setters
