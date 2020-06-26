@@ -17,7 +17,8 @@
       "description": "Check the screen for the text \"PASS\"",
       "start": "vram_start",
       "size": "vram_16_size",
-      "expected_CRCs": [ "90C1EF72" ]
+      "expected_CRCs": [ "90C1EF72" ],
+      "timeout": 7500
     }
   }
 }

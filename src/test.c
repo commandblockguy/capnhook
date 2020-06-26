@@ -7,6 +7,7 @@
 #include <fileioc.h>
 #include "hookman.h"
 
+// These aren't relocated, since we don't need to test them after the program exits
 extern hook_t hook_1, hook_2, hook_3;
 
 extern bool hook_1_run, hook_2_run, hook_3_run;
@@ -81,6 +82,18 @@ bool check_tests(void) {
     err = get_hook_priority(1, &priority);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(priority, 15);
+
+    // Test reinstalling with the same ID
+    err = install_hook(1, &hook_1, RAW_KEY, 10, "Test Hook 1 - Alt");
+    ASSERT_EQUAL(err, HOOK_SUCCESS);
+
+    err = get_hook_priority(1, &priority);
+    ASSERT_EQUAL(err, HOOK_SUCCESS);
+    ASSERT_EQUAL(priority, 15);
+
+    err = get_hook_description(1, &description);
+    ASSERT_EQUAL(err, HOOK_SUCCESS);
+    ASSERT(strcmp(description, "Test Hook 1 - Alt") == 0);
 
     // Manually trigger hook
     uint8_t a = trigger_key_hook(0);
@@ -161,7 +174,7 @@ bool check_tests(void) {
     return true;
 }
 
-void run_tests(void) {
+int main(void) {
     os_ClrHomeFull();
 
     if(check_tests()) {

@@ -43,6 +43,16 @@ enum {
 };
 typedef uint8_t hook_error_t;
 
+/**
+ * A hook in memory, as described in
+ * https://wikiti.brandonw.net/index.php?title=83Plus:OS:Hooks
+ *
+ * Installing and chaining is handled automatically by this library.
+ *
+ * Additionally, your hook should reset bit 0 of (flags-10) when returning a
+ * value to the OS, or set the bit if other hooks of the same type should be
+ * processed.
+ */
 typedef void hook_t;
 
 /**
