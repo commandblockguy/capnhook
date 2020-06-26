@@ -29,69 +29,69 @@ bool check_tests(void) {
     ti_CloseAll();
     ti_Delete("HOOKDB");
 
-    err = is_hook_installed(1, &installed);
+    err = is_hook_installed(0xFF0001, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(installed, false);
 
     // Install test hooks
-    err = install_hook(1, &hook_1, RAW_KEY, 10, "Test Hook 1");
+    err = install_hook(0xFF0001, &hook_1, RAW_KEY, 10, "Test Hook 1");
     ASSERT_EQUAL(err, HOOK_SUCCESS);
 
-    err = is_hook_installed(1, &installed);
+    err = is_hook_installed(0xFF0001, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(installed, true);
 
-    err = is_hook_installed(2, &installed);
+    err = is_hook_installed(0xFF0002, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(installed, false);
 
-    err = install_hook(2, &hook_2, RAW_KEY, 20, "Test Hook 2");
+    err = install_hook(0xFF0002, &hook_2, RAW_KEY, 20, "Test Hook 2");
     ASSERT_EQUAL(err, HOOK_SUCCESS);
 
-    err = is_hook_installed(2, &installed);
+    err = is_hook_installed(0xFF0002, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(installed, true);
 
-    err = install_hook(3, &hook_3, RAW_KEY, 25, "Test Hook 2");
+    err = install_hook(0xFF0003, &hook_3, RAW_KEY, 25, "Test Hook 2");
     ASSERT_EQUAL(err, HOOK_SUCCESS);
 
-    err = is_hook_installed(2, &installed);
+    err = is_hook_installed(0xFF0002, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(installed, true);
 
     // Check all of the get/is functions
-    err = get_hook_priority(1, &priority);
+    err = get_hook_priority(0xFF0001, &priority);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(priority, 10);
-    err = get_hook_type(1, &type);
+    err = get_hook_type(0xFF0001, &type);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(type, RAW_KEY);
-    err = get_hook_by_id(1, &hook);
+    err = get_hook_by_id(0xFF0001, &hook);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(hook, &hook_1);
-    err = get_hook_description(1, &description);
+    err = get_hook_description(0xFF0001, &description);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT(strcmp(description, "Test Hook 1") == 0);
-    err = is_hook_enabled(1, &installed);
+    err = is_hook_enabled(0xFF0001, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(installed, true);
 
     // Change priority
-    err = set_hook_priority(1, 15);
+    err = set_hook_priority(0xFF0001, 15);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
-    err = get_hook_priority(1, &priority);
+    err = get_hook_priority(0xFF0001, &priority);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(priority, 15);
 
     // Test reinstalling with the same ID
-    err = install_hook(1, &hook_1, RAW_KEY, 10, "Test Hook 1 - Alt");
+    err = install_hook(0xFF0001, &hook_1, RAW_KEY, 10, "Test Hook 1 - Alt");
     ASSERT_EQUAL(err, HOOK_SUCCESS);
 
-    err = get_hook_priority(1, &priority);
+    err = get_hook_priority(0xFF0001, &priority);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(priority, 15);
 
-    err = get_hook_description(1, &description);
+    err = get_hook_description(0xFF0001, &description);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT(strcmp(description, "Test Hook 1 - Alt") == 0);
 
@@ -116,10 +116,10 @@ bool check_tests(void) {
     ASSERT_EQUAL(hook_3_run, false);
 
     // Disable a hook
-    err = disable_hook(1);
+    err = disable_hook(0xFF0001);
     ASSERT_EQUAL(err, 0);
 
-    err = is_hook_enabled(1, &installed);
+    err = is_hook_enabled(0xFF0001, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(installed, false);
 
@@ -130,10 +130,10 @@ bool check_tests(void) {
     ASSERT_EQUAL(hook_3_run, true);
 
     // Re-enable hook
-    err = enable_hook(1);
+    err = enable_hook(0xFF0001);
     ASSERT_EQUAL(err, 0);
 
-    err = is_hook_enabled(1, &installed);
+    err = is_hook_enabled(0xFF0001, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(installed, true);
 
@@ -144,24 +144,24 @@ bool check_tests(void) {
     ASSERT_EQUAL(hook_3_run, false);
 
     // Hook validation
-    err = check_hook_validity(1);
+    err = check_hook_validity(0xFF0001);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
 
     *(uint8_t*)&hook_1 = 0x00;
 
-    err = check_hook_validity(1);
+    err = check_hook_validity(0xFF0001);
     ASSERT_EQUAL(err, HOOK_ERROR_INVALID_USER_HOOK);
 
     *(uint8_t*)&hook_1 = 0x83;
 
-    err = check_hook_validity(1);
+    err = check_hook_validity(0xFF0001);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
 
     // Uninstall hook
-    err = uninstall_hook(1);
+    err = uninstall_hook(0xFF0001);
     ASSERT_EQUAL(err, 0);
 
-    err = is_hook_installed(1, &installed);
+    err = is_hook_installed(0xFF0001, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(installed, false);
 
