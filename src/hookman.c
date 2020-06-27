@@ -44,9 +44,9 @@ void clear_hook(uint24_t type);
 void debug_print_db(void);
 #endif
 
-extern hook_t **hook_addresses[NUM_HOOK_TYPES];
+extern hook_t **hook_addresses[HOOK_NUM_TYPES];
 
-hook_error_t refresh_hooks(void) {
+hook_error_t hook_RefreshHooks(void) {
 #ifndef NDEBUG
     debug_print_db();
 #endif
@@ -63,7 +63,7 @@ hook_error_t refresh_hooks(void) {
     user_hook_entry_t *end = ti_GetDataPtr(db);
 
     //todo: faster
-    for(int type = 0; type < NUM_HOOK_TYPES; type++) {
+    for(int type = 0; type < HOOK_NUM_TYPES; type++) {
         uint8_t number_hooks = 0;
         hook_t *hooks[256];
         for(user_hook_entry_t *entry = entries; entry < end; entry++) {
@@ -92,8 +92,8 @@ hook_error_t refresh_hooks(void) {
     return HOOK_SUCCESS;
 }
 
-hook_error_t install_hook(uint24_t id, hook_t *hook, hook_type_t type, uint8_t priority, const char *description) {
-    if(type >= NUM_HOOK_TYPES) return HOOK_ERROR_UNKNOWN_TYPE;
+hook_error_t hook_Install(uint24_t id, hook_t *hook, hook_type_t type, uint8_t priority, const char *description) {
+    if(type >= HOOK_NUM_TYPES) return HOOK_ERROR_UNKNOWN_TYPE;
     if(!user_hook_valid(hook)) return HOOK_ERROR_INVALID_USER_HOOK;
 
     size_t description_length = strlen(description);
@@ -123,7 +123,7 @@ hook_error_t install_hook(uint24_t id, hook_t *hook, hook_type_t type, uint8_t p
     return write_db(db, true);
 }
 
-hook_error_t uninstall_hook(uint24_t id) {
+hook_error_t hook_Uninstall(uint24_t id) {
     ti_var_t db;
     hook_error_t error = copy_db(&db);
     if(error) return error;
@@ -153,7 +153,7 @@ hook_error_t uninstall_hook(uint24_t id) {
 }
 
 // todo: check if the ID is an imported OS hook
-hook_error_t set_hook_priority(uint24_t id, uint8_t priority) {
+hook_error_t hook_SetPriority(uint24_t id, uint8_t priority) {
     ti_var_t db;
     hook_error_t error = copy_db(&db);
     if(error) return error;
@@ -167,7 +167,7 @@ hook_error_t set_hook_priority(uint24_t id, uint8_t priority) {
     return write_db(db, true);
 }
 
-hook_error_t enable_hook(uint24_t id) {
+hook_error_t hook_Enable(uint24_t id) {
     ti_var_t db;
     hook_error_t error = copy_db(&db);
     if(error) return error;
@@ -183,7 +183,7 @@ hook_error_t enable_hook(uint24_t id) {
     return write_db(db, true);
 }
 
-hook_error_t disable_hook(uint24_t id) {
+hook_error_t hook_Disable(uint24_t id) {
     ti_var_t db;
     hook_error_t error = copy_db(&db);
     if(error) return error;
@@ -197,7 +197,7 @@ hook_error_t disable_hook(uint24_t id) {
     return write_db(db, true);
 }
 
-hook_error_t is_hook_installed(uint24_t id, bool *result) {
+hook_error_t hook_IsInstalled(uint24_t id, bool *result) {
     ti_var_t db = ti_Open(DB_NAME, "r");
     if(!db) {
         *result = false;
@@ -214,7 +214,7 @@ hook_error_t is_hook_installed(uint24_t id, bool *result) {
     return HOOK_SUCCESS;
 }
 
-hook_error_t get_hook_by_id(uint24_t id, hook_t **result) {
+hook_error_t hook_GetHook(uint24_t id, hook_t **result) {
     ti_var_t db = ti_Open(DB_NAME, "r");
     if(!db) {
         *result = NULL;
@@ -235,7 +235,7 @@ hook_error_t get_hook_by_id(uint24_t id, hook_t **result) {
     return HOOK_SUCCESS;
 }
 
-hook_error_t get_hook_type(uint24_t id, hook_type_t *result) {
+hook_error_t hook_GetType(uint24_t id, hook_type_t *result) {
     ti_var_t db = ti_Open(DB_NAME, "r");
     if(!db) {
         *result = HOOK_TYPE_UNKNOWN;
@@ -256,7 +256,7 @@ hook_error_t get_hook_type(uint24_t id, hook_type_t *result) {
     return HOOK_SUCCESS;
 }
 
-hook_error_t get_hook_priority(uint24_t id, uint8_t *result) {
+hook_error_t hook_GetPriority(uint24_t id, uint8_t *result) {
     ti_var_t db = ti_Open(DB_NAME, "r");
     if(!db) {
         ti_Close(db);
@@ -278,7 +278,7 @@ hook_error_t get_hook_priority(uint24_t id, uint8_t *result) {
     return HOOK_SUCCESS;
 }
 
-hook_error_t is_hook_enabled(uint24_t id, bool *result) {
+hook_error_t hook_IsEnabled(uint24_t id, bool *result) {
     ti_var_t db = ti_Open(DB_NAME, "r");
     if(!db) {
         *result = false;
@@ -299,7 +299,7 @@ hook_error_t is_hook_enabled(uint24_t id, bool *result) {
     return HOOK_SUCCESS;
 }
 
-hook_error_t get_hook_description(uint24_t id, char **result) {
+hook_error_t hook_GetDescription(uint24_t id, char **result) {
     ti_var_t db = ti_Open(DB_NAME, "r");
     if(!db) {
         *result = NULL;
@@ -320,7 +320,7 @@ hook_error_t get_hook_description(uint24_t id, char **result) {
     return HOOK_SUCCESS;
 }
 
-hook_error_t check_hook_validity(uint24_t id) {
+hook_error_t hook_CheckValidity(uint24_t id) {
     ti_var_t db = ti_Open(DB_NAME, "r");
     if(!db) {
         return HOOK_ERROR_INTERNAL_DATABASE_IO;
@@ -420,7 +420,7 @@ hook_error_t write_db(ti_var_t db, bool refresh) {
     ti_Close(db);
     if(ti_Rename(DB_TEMP_NAME, DB_NAME)) return HOOK_ERROR_DATABASE_CORRUPTED;
 
-    return refresh_hooks();
+    return hook_RefreshHooks();
 }
 
 hook_error_t insert_existing(void) {
@@ -431,7 +431,7 @@ hook_error_t insert_existing(void) {
     bool needs_update = false;
 
     // Use the type as an ID
-    for(int type = 0; type < NUM_HOOK_TYPES; type++) {
+    for(int type = 0; type < HOOK_NUM_TYPES; type++) {
         // Check if the hook type is enabled
         if(!check_hook(type)) continue;
         // Check if the hook pointer is valid
