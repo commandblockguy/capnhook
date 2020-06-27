@@ -8,14 +8,18 @@
 #include "hookman.h"
 
 // These aren't relocated, since we don't need to test them after the program exits
-extern hook_t hook_1, hook_2, hook_3;
+extern hook_t hook_1, hook_2, hook_3, hook_os;
 
-extern bool hook_1_run, hook_2_run, hook_3_run;
+extern bool hook_1_run, hook_2_run, hook_3_run, hook_os_run;
 
 uint8_t trigger_key_hook(uint8_t a);
+void set_key_hook(hook_t *hook);
 
-#define ASSERT(cond) if(!(cond)) {dbg_sprintf((char*)dbgout, "Assertion failed on line %u\n", __LINE__); return false;}
-#define ASSERT_EQUAL(var, known) if(var != known) {dbg_sprintf((char*)dbgout, "Assertion failed on line %u, value 0x%X\n", __LINE__, (int)var); return false;}
+bool check_hook(uint24_t type);
+void clear_hook(uint24_t type);
+
+#define ASSERT(cond) if(!(cond)) {dbg_sprintf((char*)dbgout, "Assertion failed on line %u\n", __LINE__); return false;} else dbg_sprintf((char*)dbgout, "Assertion passed on line %u\n", __LINE__)
+#define ASSERT_EQUAL(var, known) if(var != known) {dbg_sprintf((char*)dbgout, "Assertion failed on line %u, value 0x%X\n", __LINE__, (int)var); return false;} else dbg_sprintf((char*)dbgout, "Assertion passed on line %u\n", __LINE__)
 
 bool check_tests(void) {
     uint8_t priority;
@@ -28,6 +32,10 @@ bool check_tests(void) {
     // Delete old hook db
     ti_CloseAll();
     ti_Delete("HOOKDB");
+
+    clear_hook(RAW_KEY);
+
+    ASSERT_EQUAL(check_hook(RAW_KEY), false);
 
     err = is_hook_installed(0xFF0001, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
@@ -44,6 +52,12 @@ bool check_tests(void) {
     err = is_hook_installed(0xFF0002, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(installed, false);
+
+    err = is_hook_installed(RAW_KEY, &installed);
+    ASSERT_EQUAL(err, HOOK_SUCCESS);
+    ASSERT_EQUAL(installed, false);
+
+    ASSERT_EQUAL(check_hook(RAW_KEY), true);
 
     err = install_hook(0xFF0002, &hook_2, RAW_KEY, 20, "Test Hook 2");
     ASSERT_EQUAL(err, HOOK_SUCCESS);
@@ -101,6 +115,7 @@ bool check_tests(void) {
     ASSERT_EQUAL(hook_1_run, true);
     ASSERT_EQUAL(hook_2_run, true);
     ASSERT_EQUAL(hook_3_run, true);
+    ASSERT_EQUAL(hook_os_run, false);
 
     // Check if priorities are processed properly
     a = trigger_key_hook(0x9A);
@@ -114,6 +129,33 @@ bool check_tests(void) {
     ASSERT_EQUAL(hook_1_run, true);
     ASSERT_EQUAL(hook_2_run, true);
     ASSERT_EQUAL(hook_3_run, false);
+
+    // Check that imported OS hooks behave correctly
+    set_key_hook(&hook_os);
+    a = trigger_key_hook(0x9F);
+    ASSERT_EQUAL(a, 0xA0);
+    ASSERT_EQUAL(hook_1_run, false);
+    ASSERT_EQUAL(hook_2_run, false);
+    ASSERT_EQUAL(hook_3_run, false);
+    ASSERT_EQUAL(hook_os_run, true);
+
+    refresh_hooks();
+    err = is_hook_installed(RAW_KEY, &installed);
+    ASSERT_EQUAL(err, HOOK_SUCCESS);
+    ASSERT_EQUAL(installed, true);
+    err = get_hook_priority(RAW_KEY, &priority);
+    ASSERT_EQUAL(err, HOOK_SUCCESS);
+    ASSERT_EQUAL(priority, 255);
+    err = get_hook_type(RAW_KEY, &type);
+    ASSERT_EQUAL(err, HOOK_SUCCESS);
+    ASSERT_EQUAL(type, RAW_KEY);
+
+    a = trigger_key_hook(0x9F);
+    ASSERT_EQUAL(a, 0xA0);
+    ASSERT_EQUAL(hook_1_run, true);
+    ASSERT_EQUAL(hook_2_run, true);
+    ASSERT_EQUAL(hook_3_run, true);
+    ASSERT_EQUAL(hook_os_run, true);
 
     // Disable a hook
     err = disable_hook(0xFF0001);

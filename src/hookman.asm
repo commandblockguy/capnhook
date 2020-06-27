@@ -1,6 +1,9 @@
 public	_set_hook_by_type
 public	_install_main_executor
 public	_install_individual_executor
+public	_hook_addresses
+public	_check_hook
+public	_clear_hook
 
 extern	main_executor
 extern	main_executor_call_location
@@ -16,7 +19,8 @@ extern _flash_relocate
 
 include	"hook_equates.inc"
 
-_FindFreeArcSpot	equ $0022078
+_FindFreeArcSpot	equ	$022078
+flags			equ	$D00080
 
 _install_main_executor:
 	ld	hl,main_executor_size
@@ -53,13 +57,15 @@ _install_individual_executor:
 	call	_flash_relocate
 	pop	bc,bc
 
+	inc	hl
+
 	; temp - set breakpoint for individual executor
 	;push	hl
 	;pop	de
 	;inc	de
 	;scf
-	;sbc    hl,hl
-	;ld     (hl),3
+	;sbc	hl,hl
+	;ld	 (hl),3
 	;push	de
 	;pop	hl
 	;dec	hl
@@ -90,6 +96,71 @@ find_install_location:
 	ld	bc,15
 	add	hl,bc
 	ret
+
+macro iypos flag,bit
+	db	flag,($46) or (bit shl 3)
+end macro
+
+_check_hook:
+	ld	iy,flags
+	pop	bc,de
+	push	de,bc
+
+	ld	hl,.table
+	add	hl,de
+	add	hl,de
+
+	ld	a,(hl)
+	ld	(.smc),a
+	inc	hl
+	ld	a,(hl)
+	ld	(.smc + 1),a
+
+	xor	a,a
+	bit	0,(iy+0)
+.smc = $-2
+	ret	z
+	inc	a
+	ret
+.table:
+	iypos	 hookflags2,7	; CURSOR
+	iypos	 hookflags2,1	; LIBRARY
+	iypos	 hookflags2,5	; RAW_KEY
+	iypos	 hookflags2,0	; GET_CSC
+	iypos	 hookflags2,4	; HOMESCREEN
+	iypos	 hookflags3,2	; WINDOW
+	iypos	 hookflags3,3	; GRAPH
+	iypos	 hookflags3,4	; Y_EQUALS
+	iypos	 hookflags3,5	; FONT
+	iypos	 hookflags3,6	; REGRAPH
+	iypos	 hookflags3,7	; GRAPHICS
+	iypos	 hookflags4,0	; TRACE
+	iypos	 hookflags4,1	; PARSER
+	iypos	 hookflags4,2	; APP_CHANGE
+	iypos	 hookflags4,3	; CATALOG1
+	iypos	 hookflags4,4	; HELP
+	iypos	 hookflags4,5	; CX_REDISP
+	iypos	 hookflags4,6	; MENU
+	iypos	 hookflags2,6	; CATALOG2
+	iypos	 hookflags3,0	; TOKEN
+	iypos	 hookflags3,1	; LOCALIZE
+	iypos	 hookflags4,7	; SILENT_LINK
+	iypos	 hookflags5,0	; USB_ACTIVITY
+
+_clear_hook:
+	pop	bc,de
+	push	de,bc
+
+	ld	iy,flags
+
+	ld	hl,hook_clearers
+	add	hl,de
+	add	hl,de
+	add	hl,de
+
+	ld	hl,(hl)
+
+	jp	(hl)
 
 main_executor_location:
 	rl	1
@@ -142,3 +213,27 @@ hook_clearers:
 	dl	_ClrLocalizeHook
 	dl	_ClrSilentLinkHook
 	dl	_ClrUSBActivityHook
+_hook_addresses:
+	dl	cursorHookPtr
+	dl	libraryHookPtr
+	dl	rawKeyHookPtr
+	dl	getKeyHookPtr
+	dl	homescreenHookPtr
+	dl	windowHookPtr
+	dl	graphHookPtr
+	dl	yEqualsHookPtr
+	dl	fontHookPtr
+	dl	regraphHookPtr
+	dl	graphicsHookPtr
+	dl	traceHookPtr
+	dl	parserHookPtr
+	dl	appChangeHookPtr
+	dl	catalog1HookPtr
+	dl	helpHookPtr
+	dl	cxRedispHookPtr
+	dl	menuHookPtr
+	dl	catalog2HookPtr
+	dl	tokenHookPtr
+	dl	localizeHookPtr
+	dl	silentLinkHookPtr
+	dl	USBActivityHookPtr

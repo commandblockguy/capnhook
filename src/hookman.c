@@ -31,19 +31,28 @@ typedef struct {
 user_hook_entry_t *get_entry_by_id(uint24_t id, ti_var_t db);
 bool user_hook_valid(hook_t *hook);
 hook_error_t copy_db(ti_var_t *slot);
-hook_error_t write_db(ti_var_t db);
+hook_error_t write_db(ti_var_t db, bool refresh);
+hook_error_t insert_existing(void);
 void *flash_relocate(void *data, size_t size);
+
 void install_main_executor(void);
 void install_individual_executor(hook_type_t type, hook_t **table);
+bool check_hook(uint24_t type);
+void clear_hook(uint24_t type);
 
 #ifndef NDEBUG
 void debug_print_db(void);
 #endif
 
+extern hook_t **hook_addresses[NUM_HOOK_TYPES];
+
 hook_error_t refresh_hooks(void) {
 #ifndef NDEBUG
     debug_print_db();
 #endif
+
+    hook_error_t err = insert_existing();
+    if(err) return err;
 
     install_main_executor();
 
@@ -57,18 +66,24 @@ hook_error_t refresh_hooks(void) {
     for(int type = 0; type < NUM_HOOK_TYPES; type++) {
         uint8_t number_hooks = 0;
         hook_t *hooks[256];
-        //todo: check if another hook is active, and if so add it as a minimum priority hook - guess that also means that I'll have to add a marker so that we don't add ourself as a minimum priority hook, which would be entertaining but detrimental to proper function
         for(user_hook_entry_t *entry = entries; entry < end; entry++) {
             if(entry->type == type && user_hook_valid(entry->hook) && entry->enabled) {
                 hooks[number_hooks] = entry->hook;
                 number_hooks++;
-                if(number_hooks == 255) break;
+                if(number_hooks == 255) {
+                    dbg_sprintf(dbgout, "Maximum number of hooks exceeded for type %u\n", type);
+                    break;
+                }
             }
         }
         hooks[number_hooks] = NULL;
         if(number_hooks) {
-            hook_t **table = flash_relocate(hooks, sizeof(hooks[0]) * (number_hooks + 1));
-            if(!table) continue;
+            hook_t **table;
+            table = flash_relocate(hooks, sizeof(hooks[0]) * (number_hooks + 1));
+            if(!table) {
+                dbg_sprintf(dbgout, "Failed to relocate table for type %u\n", type);
+                continue;
+            }
             install_individual_executor(type, table);
         }
     }
@@ -105,7 +120,7 @@ hook_error_t install_hook(uint24_t id, hook_t *hook, hook_type_t type, uint8_t p
         }
     }
 
-    return write_db(db);
+    return write_db(db, true);
 }
 
 hook_error_t uninstall_hook(uint24_t id) {
@@ -134,9 +149,10 @@ hook_error_t uninstall_hook(uint24_t id) {
         return HOOK_ERROR_INTERNAL_DATABASE_IO;
     }
 
-    return write_db(db);
+    return write_db(db, true);
 }
 
+// todo: check if the ID is an imported OS hook
 hook_error_t set_hook_priority(uint24_t id, uint8_t priority) {
     ti_var_t db;
     hook_error_t error = copy_db(&db);
@@ -148,7 +164,7 @@ hook_error_t set_hook_priority(uint24_t id, uint8_t priority) {
 
     entry->priority = priority;
 
-    return write_db(db);
+    return write_db(db, true);
 }
 
 hook_error_t enable_hook(uint24_t id) {
@@ -164,7 +180,7 @@ hook_error_t enable_hook(uint24_t id) {
 
     entry->enabled = true;
 
-    return write_db(db);
+    return write_db(db, true);
 }
 
 hook_error_t disable_hook(uint24_t id) {
@@ -178,7 +194,7 @@ hook_error_t disable_hook(uint24_t id) {
 
     entry->enabled = false;
 
-    return write_db(db);
+    return write_db(db, true);
 }
 
 hook_error_t is_hook_installed(uint24_t id, bool *result) {
@@ -393,7 +409,7 @@ hook_error_t copy_db(ti_var_t *slot) {
     return HOOK_SUCCESS;
 }
 
-hook_error_t write_db(ti_var_t db) {
+hook_error_t write_db(ti_var_t db, bool refresh) {
     if(!db) return HOOK_ERROR_INTERNAL_DATABASE_IO;
 
     size_t size = ti_GetSize(db);
@@ -407,14 +423,58 @@ hook_error_t write_db(ti_var_t db) {
     return refresh_hooks();
 }
 
+hook_error_t insert_existing(void) {
+    ti_var_t db;
+    hook_error_t error = copy_db(&db);
+    if(error) return error;
+
+    bool needs_update = false;
+
+    // Use the type as an ID
+    for(int type = 0; type < NUM_HOOK_TYPES; type++) {
+        // Check if the hook type is enabled
+        if(!check_hook(type)) continue;
+        // Check if the hook pointer is valid
+        if(*(uint8_t*)*(hook_addresses[type]) != 0x83) continue;
+        // Check if this is already one of our own hooks
+        if(*((char*)*hook_addresses[type] - 1) == 'm') continue;
+
+        needs_update = true;
+
+        user_hook_entry_t entry = {type, *hook_addresses[type], type, 255, true, {0}};
+
+        user_hook_entry_t *existing = get_entry_by_id(type, db);
+        if(existing) {
+            // Replace the existing entry
+            memcpy(existing, &entry, sizeof(entry));
+        } else {
+            // Write to the end of the file
+            if(!ti_Write(&entry, sizeof(entry), 1, db)) {
+                ti_Close(db);
+                return HOOK_ERROR_INTERNAL_DATABASE_IO;
+            }
+        }
+
+        clear_hook(type);
+    }
+
+    if(needs_update) {
+        return write_db(db, false);
+    } else {
+        ti_Close(db);
+        return HOOK_SUCCESS;
+    }
+}
+
 // todo: probably use a more sophisticated way of doing this, as Mateo mentioned
 // if so, maybe also provide that method to users rather than leaving memory allocation up to them
 void *flash_relocate(void *data, size_t size) {
     void *install_location;
     if(!ti_ArchiveHasRoom(size)) return NULL;
     ti_var_t slot = ti_Open("TMP", "w");
-    ti_Write(data, size, 1, slot);
-    ti_SetArchiveStatus(true, slot);
+    if(!slot) return NULL;
+    if(!ti_Write(data, size, 1, slot)) return NULL;
+    if(!ti_SetArchiveStatus(true, slot)) return NULL;
     ti_Rewind(slot);
     install_location = ti_GetDataPtr(slot);
     ti_Close(slot);

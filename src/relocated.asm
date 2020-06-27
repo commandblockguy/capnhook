@@ -76,7 +76,7 @@ main_executor_call_destination = $
 main_executor_size = $-main_executor
 
 individual_executor:
-	db	$83
+	db	'm', $83
 	push	ix
 	ld	ix,0
 individual_executor_table = $-3
