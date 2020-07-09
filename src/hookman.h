@@ -56,13 +56,16 @@ typedef uint8_t hook_error_t;
 typedef void hook_t;
 
 /**
- * Registers the contents of the hook database with the OS
- *
- * This function is mostly for internal use, and is called by every function
- * that modifies the database.
+ * Apply changes made to the hook database
  * @return An error code or HOOK_SUCCESS
  */
-hook_error_t hook_RefreshHooks(void);
+hook_error_t hook_Sync(void);
+
+/**
+ * Discard all changes to the hook database since the last hook_Sync()
+ * @return An error code or HOOK_SUCCESS
+ */
+hook_error_t hook_Discard(void);
 
 /**
  * Installs a hook

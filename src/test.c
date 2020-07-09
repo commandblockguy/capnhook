@@ -11,6 +11,7 @@
 extern hook_t hook_1, hook_2, hook_3, hook_os;
 
 extern bool hook_1_run, hook_2_run, hook_3_run, hook_os_run;
+extern bool existing_checked;
 
 uint8_t trigger_key_hook(uint8_t a);
 void set_key_hook(hook_t *hook);
@@ -57,6 +58,7 @@ bool check_tests(void) {
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(installed, false);
 
+    hook_Sync();
     ASSERT_EQUAL(check_hook(HOOK_TYPE_RAW_KEY), true);
 
     err = hook_Install(0xFF0002, &hook_2, HOOK_TYPE_RAW_KEY, 20, "Test Hook 2");
@@ -109,6 +111,8 @@ bool check_tests(void) {
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT(strcmp(description, "Test Hook 1 - Alt") == 0);
 
+    hook_Sync();
+
     // Manually trigger hook
     uint8_t a = trigger_key_hook(0);
     ASSERT_EQUAL(a, 0);
@@ -139,7 +143,8 @@ bool check_tests(void) {
     ASSERT_EQUAL(hook_3_run, false);
     ASSERT_EQUAL(hook_os_run, true);
 
-    hook_RefreshHooks();
+    existing_checked = false;
+    hook_Sync();
     err = hook_IsInstalled(HOOK_TYPE_RAW_KEY, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(installed, true);
@@ -165,6 +170,8 @@ bool check_tests(void) {
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(installed, false);
 
+    hook_Sync();
+
     a = trigger_key_hook(0x9A);
     ASSERT_EQUAL(a, 0x9A);
     ASSERT_EQUAL(hook_1_run, false);
@@ -178,6 +185,8 @@ bool check_tests(void) {
     err = hook_IsEnabled(0xFF0001, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(installed, true);
+
+    hook_Sync();
 
     a = trigger_key_hook(0x9A);
     ASSERT_EQUAL(a, 0x9B);
@@ -206,6 +215,8 @@ bool check_tests(void) {
     err = hook_IsInstalled(0xFF0001, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(installed, false);
+
+    hook_Sync();
 
     a = trigger_key_hook(0x9A);
     ASSERT_EQUAL(a, 0x9A);
