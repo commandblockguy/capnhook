@@ -1,3 +1,5 @@
+public _init
+
 public	_set_hook_by_type
 public	_install_main_executor
 public	_install_individual_executor
@@ -17,10 +19,133 @@ extern	individual_executor_size
 
 extern _flash_relocate
 
+extern _initted
+extern _existing_checked
+extern _database_modified
+
+extern _insert_existing
+
 include	"hook_equates.inc"
 
+_GetCSC			equ	$02014C
+_Mov9ToOP1		equ	$020320
+_ChkFindSym		equ	$02050C
+_EnoughMem		equ	$02051C
+_CreateAppVar		equ	$021330
+_ChkInRam		equ	$021F98
 _FindFreeArcSpot	equ	$022078
+
+OP1			equ	$D005F8
 flags			equ	$D00080
+
+AppVarObj		equ	$15
+
+virtual at 0
+	HOOK_SUCCESS				rb	1
+	HOOK_ERROR_NO_MATCHING_ID		rb	1
+	HOOK_ERROR_INVALID_USER_HOOK		rb	1
+	HOOK_ERROR_UNKNOWN_TYPE			rb	1
+	HOOK_ERROR_DESCRIPTION_TOO_LONG		rb	1
+	HOOK_ERROR_INTERNAL_DATABASE_IO		rb	1
+	HOOK_ERROR_NEEDS_GC			rb	1
+	HOOK_ERROR_DATABASE_CORRUPTED		rb	1
+	HOOK_ERROR_UNKNOWN_DATABASE_VERSION	rb	1
+end virtual
+
+current_version		equ	0
+
+; todo: remove
+open_dbg:
+	push	hl
+	scf
+	sbc    hl,hl
+	ld     (hl),2
+	pop	hl
+	ret
+
+_init:
+	; check if temp DB already exists
+	ld	hl,temp_db_name
+	call	_Mov9ToOP1
+	call	_ChkFindSym
+	jq	c,.create_temp_db
+	call	_ChkInRam
+	jq	z,.temp_db_exists
+	; todo: unarchive temp db
+	jq	.temp_db_exists
+.create_temp_db:
+	; check if real DB exists
+	ld	hl,db_name
+	call	_Mov9ToOP1
+	call	_ChkFindSym
+	jq	nc,.real_db_exists
+
+	; real DB does not exist - create empty temp DB
+	ld	hl,3 ; return if no space
+	call	_EnoughMem
+	ld	a,HOOK_ERROR_INTERNAL_DATABASE_IO ; todo: add new "no memory" error?
+	ret	c
+
+	ld	hl,temp_db_name
+	call	_Mov9ToOP1
+	ld	hl,3
+	call	_CreateAppVar
+
+	ex	hl,de
+	inc	hl
+	inc	hl ; hl = appvar data pointer
+	ld	de,current_version
+	ld	(hl),de
+	jq	.temp_db_exists
+.real_db_exists:
+	; todo: check version, archive if not already
+	; get size of DB
+	ex	hl,de
+	ld	bc,9 ; todo: only do this if archived
+	add	hl,bc ; hl = pointer to name length
+	ld	bc,0
+	ld	c,(hl)
+	add	hl,bc
+	inc	hl ; hl = pointer to size
+	push	hl
+	ld	de,(hl)
+	ex	hl,de
+	; check if there is enough memory
+	call	_EnoughMem
+	jq	c,.pop_ret_internal_error
+	push	de
+
+	; create var for temp DB
+	ld	hl,temp_db_name
+	call	_Mov9ToOP1
+	pop	hl
+	push	hl
+	call	_CreateAppVar
+	pop	bc
+	pop	hl
+	inc	hl
+	inc	hl
+	inc	de
+	inc	de
+	ldir
+.temp_db_exists:
+	ld	hl,_existing_checked
+	bit	0,(hl)
+	jq	nz,.checked_existing
+	set	0,(hl)
+	call	_insert_existing
+	or	a,a
+	ret	c
+.checked_existing:
+	ld	a,1
+	ld	(_initted),a
+
+	xor	a,a ; return HOOK_SUCCESS
+	ret
+.pop_ret_internal_error:
+	pop	hl
+	ld	a,HOOK_ERROR_INTERNAL_DATABASE_IO
+	ret
 
 _install_main_executor:
 	ld	hl,main_executor_size
@@ -237,3 +362,8 @@ _hook_addresses:
 	dl	localizeHookPtr
 	dl	silentLinkHookPtr
 	dl	USBActivityHookPtr
+
+temp_db_name:
+	db	AppVarObj,"HOOKTMP",0
+db_name:
+	db	AppVarObj,"HOOKDB",0,0

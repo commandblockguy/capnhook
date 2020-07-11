@@ -33,7 +33,6 @@ user_hook_entry_t *get_entry_by_id(uint24_t id, ti_var_t db);
 hook_error_t remove_entry(user_hook_entry_t *entry, ti_var_t db);
 bool user_hook_valid(hook_t *hook);
 hook_error_t init(void);
-hook_error_t copy_db(ti_var_t *slot);
 hook_error_t open_db(ti_var_t *slot);
 ti_var_t open_db_readonly(void);
 hook_error_t insert_existing(void);
@@ -72,7 +71,7 @@ hook_error_t hook_Sync(void) {
 
         size_t size = ti_GetSize(db);
 
-        if(!ti_ArchiveHasRoom(size)) return HOOK_ERROR_NEEDS_GC;
+        if(!ti_ArchiveHasRoom(size * 2)) return HOOK_ERROR_NEEDS_GC; // todo: add VAT entry size?
         if(!ti_SetArchiveStatus(true, db)) return HOOK_ERROR_DATABASE_CORRUPTED;
         database_modified = false;
         ti_Delete(DB_NAME);
@@ -439,72 +438,6 @@ hook_error_t remove_entry(user_hook_entry_t *entry, ti_var_t db) {
 
 bool user_hook_valid(hook_t *hook) {
     return *(uint8_t*)hook == 0x83;
-}
-
-hook_error_t init(void) {
-    ti_var_t slot;
-    hook_error_t err;
-
-    err = copy_db(&slot);
-    ti_Close(slot);
-    if(err) return err;
-
-    if(!existing_checked) {
-        existing_checked = true;
-        err = insert_existing();
-        if(err) return err;
-    }
-
-    initted = true;
-
-    return HOOK_SUCCESS;
-}
-
-hook_error_t copy_db(ti_var_t *slot) {
-    ti_var_t new = ti_Open(DB_TEMP_NAME, "w+");
-    if(!new) {
-        *slot = 0;
-        return HOOK_ERROR_INTERNAL_DATABASE_IO;
-    }
-
-    ti_var_t old = ti_Open(DB_NAME, "r");
-    if(!old) {
-        // Created a new, empty database
-        ti_Write(&header, sizeof(database_header_t), 1, new);
-        *slot = new;
-        return HOOK_SUCCESS;
-    }
-
-    void *data_ptr = ti_GetDataPtr(old);
-    size_t db_size = ti_GetSize(old);
-
-    if(!data_ptr) {
-        ti_Close(new);
-        ti_Close(old);
-        *slot = 0;
-        return HOOK_ERROR_INTERNAL_DATABASE_IO;
-    }
-
-    database_header_t db_header = {0xFFFFFF};
-    ti_Read(&db_header, sizeof(database_header_t), 1, old);
-    if(db_header.version > CURRENT_VERSION) {
-        ti_Close(new);
-        ti_Close(old);
-        *slot = 0;
-        return HOOK_ERROR_UNKNOWN_DATABASE_VERSION;
-    }
-
-    if(!ti_Write(data_ptr, db_size, 1, new)) {
-        ti_Close(new);
-        ti_Close(old);
-        *slot = 0;
-        return HOOK_ERROR_INTERNAL_DATABASE_IO;
-    }
-
-    ti_Close(old);
-
-    *slot = new;
-    return HOOK_SUCCESS;
 }
 
 hook_error_t open_db(ti_var_t *slot) {
