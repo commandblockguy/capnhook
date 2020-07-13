@@ -32,7 +32,8 @@ bool check_tests(void) {
     // Assume that the calc has been freshly reset
     // Delete old hook db
     ti_CloseAll();
-    ti_Delete("HOOKDB");
+    ti_Delete("HOOKSDB");
+    ti_Delete("HOOKTMP");
 
     clear_hook(HOOK_TYPE_RAW_KEY);
 

@@ -1,3 +1,4 @@
+public _hook_Sync
 public _init
 
 public	_set_hook_by_type
@@ -24,6 +25,8 @@ extern _existing_checked
 extern _database_modified
 
 extern _insert_existing
+extern _hook_Discard
+extern _install_hooks
 
 include	"hook_equates.inc"
 
@@ -31,7 +34,11 @@ _GetCSC			equ	$02014C
 _Mov9ToOP1		equ	$020320
 _ChkFindSym		equ	$02050C
 _EnoughMem		equ	$02051C
+_PopOP1			equ	$0205C4
+_PushOP1		equ	$020628
 _CreateAppVar		equ	$021330
+_DelVarArc		equ	$021434
+_Arc_Unarc		equ	$021448
 _ChkInRam		equ	$021F98
 _FindFreeArcSpot	equ	$022078
 
@@ -61,6 +68,71 @@ open_dbg:
 	sbc    hl,hl
 	ld     (hl),2
 	pop	hl
+	ret
+
+_hook_Sync:
+	ld	a,(_existing_checked)
+	or	a,a
+	call	z,_init
+
+	ld	a,(_initted)
+	or	a,a
+	ret	z
+
+	ld	a,(_database_modified)
+	or	a,a
+	jr	z,.not_modified
+
+	ld	hl,temp_db_name
+	call	_Mov9ToOP1
+	call	_ChkFindSym
+
+	ld	a,HOOK_ERROR_INTERNAL_DATABASE_IO
+	ret	c
+	call	_ChkInRam
+	ret	nz
+
+	ex	hl,de ; hl = pointer to size
+	ld	de,(hl)
+	ex.sis	hl,de
+
+	ld	bc,12
+	add	hl,bc
+	call	_FindFreeArcSpot ; no idea how this call works, and am just copying ti_ArchiveHasRoom
+	ld	a,HOOK_ERROR_NEEDS_GC
+	ret	z
+
+	ld	hl,db_name
+	call	_Mov9ToOP1
+	call	_ChkFindSym
+	jr	c,.deleted
+	call	_DelVarArc
+
+.deleted:
+	ld	hl,temp_db_name
+	call	_Mov9ToOP1
+	call	_ChkFindSym
+
+	ld	a,HOOK_ERROR_INTERNAL_DATABASE_IO
+	ret	c
+
+	ld	de,-13
+	add	hl,de
+	ld	de,'BDS'
+	ld	(hl),de
+
+	ld	hl,db_name
+	call	_Mov9ToOP1
+	ld	iy,flags
+	call	_Arc_Unarc
+
+	call	_install_hooks
+	or	a,a
+	ret	nz
+
+.not_modified:
+	call	_hook_Discard
+
 	ret
 
 _init:
@@ -103,7 +175,6 @@ _init:
 	ex	hl,de
 	ld	bc,9 ; todo: only do this if archived
 	add	hl,bc ; hl = pointer to name length
-	ld	bc,0
 	ld	c,(hl)
 	add	hl,bc
 	inc	hl ; hl = pointer to size
@@ -366,4 +437,4 @@ _hook_addresses:
 temp_db_name:
 	db	AppVarObj,"HOOKTMP",0
 db_name:
-	db	AppVarObj,"HOOKDB",0,0
+	db	AppVarObj,"HOOKSDB",0

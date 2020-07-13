@@ -3,7 +3,7 @@
 #include <fileioc.h>
 #include "hookman.h"
 
-#define DB_NAME "HOOKDB"
+#define DB_NAME "HOOKSDB"
 #define DB_TEMP_NAME "HOOKTMP"
 
 #undef NDEBUG // since it's broken in llvm
@@ -56,37 +56,6 @@ extern hook_t **hook_addresses[HOOK_NUM_TYPES];
 bool initted = false;
 bool existing_checked = false;
 bool database_modified = false;
-
-hook_error_t hook_Sync(void) {
-    hook_error_t err;
-
-    if(!existing_checked) {
-        init();
-    }
-    if(!initted) return HOOK_SUCCESS;
-
-    if(database_modified) {
-        ti_var_t db = ti_Open(DB_TEMP_NAME, "r");
-        if(!db) return HOOK_ERROR_INTERNAL_DATABASE_IO;
-
-        size_t size = ti_GetSize(db);
-
-        if(!ti_ArchiveHasRoom(size * 2)) return HOOK_ERROR_NEEDS_GC; // todo: add VAT entry size?
-        if(!ti_SetArchiveStatus(true, db)) return HOOK_ERROR_DATABASE_CORRUPTED;
-        database_modified = false;
-        ti_Delete(DB_NAME);
-        ti_Close(db);
-        if(ti_Rename(DB_TEMP_NAME, DB_NAME)) return HOOK_ERROR_DATABASE_CORRUPTED;
-        initted = false;
-
-        err = install_hooks();
-        if(err) return err;
-    } else {
-        hook_Discard();
-    }
-
-    return HOOK_SUCCESS;
-}
 
 hook_error_t hook_Discard(void) {
     ti_Delete(DB_TEMP_NAME);
