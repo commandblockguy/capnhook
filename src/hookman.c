@@ -37,6 +37,7 @@ ti_var_t open_db_readonly(void);
 hook_error_t insert_existing(void);
 void mark_database_modified(void);
 void *flash_relocate(void *data, size_t size);
+void sort_by_priority(hook_t **hooks, uint8_t *priorities, uint8_t num_hooks);
 hook_error_t install_hooks(void);
 
 void install_main_executor(void);
@@ -95,6 +96,24 @@ hook_error_t hook_Discard(void) {
     return HOOK_SUCCESS;
 }
 
+void sort_by_priority(hook_t **hooks, uint8_t *priorities, uint8_t num_hooks) {
+    for(uint8_t i = 0; i < num_hooks - 1; i++) {
+        uint8_t min_index = i;
+        for(uint8_t j = i + 1; j < num_hooks; j++) {
+            if(priorities[j] < priorities[min_index]) min_index = j;
+        }
+        if(min_index != i) {
+            // Swap hooks at min_index and i
+            hook_t *hook = hooks[min_index];
+            uint8_t priority = priorities[min_index];
+            hooks[min_index] = hooks[i];
+            priorities[min_index] = priorities[i];
+            hooks[i] = hook;
+            priorities[i] = priority;
+        }
+    }
+}
+
 hook_error_t install_hooks(void) {
     install_main_executor();
 
@@ -109,8 +128,10 @@ hook_error_t install_hooks(void) {
         uint8_t number_hooks = 0;
         hook_t *hooks[256];
         for(user_hook_entry_t *entry = entries; entry < end; entry++) {
+        uint8_t priorities[256];
             if(entry->type == type && user_hook_valid(entry->hook) && entry->enabled) {
                 hooks[number_hooks] = entry->hook;
+                priorities[number_hooks] = entry->priority;
                 number_hooks++;
                 if(number_hooks == 255) {
                     dbg_sprintf(dbgout, "Maximum number of hooks exceeded for type %u\n", type);
@@ -118,9 +139,10 @@ hook_error_t install_hooks(void) {
                 }
             }
         }
-        hooks[number_hooks] = NULL;
         if(number_hooks) {
             hook_t **table;
+            sort_by_priority(hooks, priorities, number_hooks);
+            hooks[number_hooks] = NULL;
             table = flash_relocate(hooks, sizeof(hooks[0]) * (number_hooks + 1));
             if(!table) {
                 dbg_sprintf(dbgout, "Failed to relocate table for type %u\n", type);
