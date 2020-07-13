@@ -83,7 +83,7 @@ hook_error_t hook_Discard(void);
  * trigger on.
  * @param priority Hooks with lower priority values are called prior to hooks
  * with higher priority values.
- * @param description A human-readable description of the hook, up to 64 chars.
+ * @param description A human-readable description of the hook, up to 255 chars.
  * @return An error code or HOOK_SUCCESS
  */
 hook_error_t hook_Install(uint24_t id, hook_t *hook, hook_type_t type, uint8_t priority, const char *description);

@@ -25,10 +25,12 @@ typedef struct {
     uint8_t type;			// enum for which OS hook to use
     uint8_t priority;		// process lowest priorities first
     bool enabled;
-    char description[64];
+    char description[1];
 } user_hook_entry_t;
 
+user_hook_entry_t *get_next(user_hook_entry_t *entry);
 user_hook_entry_t *get_entry_by_id(uint24_t id, ti_var_t db);
+hook_error_t remove_entry(user_hook_entry_t *entry, ti_var_t db);
 bool user_hook_valid(hook_t *hook);
 hook_error_t init(void);
 hook_error_t copy_db(ti_var_t *slot);
@@ -127,8 +129,8 @@ hook_error_t install_hooks(void) {
     for(int type = 0; type < HOOK_NUM_TYPES; type++) {
         uint8_t number_hooks = 0;
         hook_t *hooks[256];
-        for(user_hook_entry_t *entry = entries; entry < end; entry++) {
         uint8_t priorities[256];
+        for(user_hook_entry_t *entry = entries; entry < end; entry = get_next(entry)) {
             if(entry->type == type && user_hook_valid(entry->hook) && entry->enabled) {
                 hooks[number_hooks] = entry->hook;
                 priorities[number_hooks] = entry->priority;
@@ -161,28 +163,27 @@ hook_error_t hook_Install(uint24_t id, hook_t *hook, hook_type_t type, uint8_t p
     if(!user_hook_valid(hook)) return HOOK_ERROR_INVALID_USER_HOOK;
 
     size_t description_length = strlen(description);
-    if(description_length > 63) return HOOK_ERROR_DESCRIPTION_TOO_LONG;
+    if(description_length > 255) return HOOK_ERROR_DESCRIPTION_TOO_LONG;
 
     ti_var_t db;
     hook_error_t err = open_db(&db);
     if(err) return err;
 
-    user_hook_entry_t entry = {id, hook, type, priority, true, {0}};
-
-    strcpy(entry.description, description);
+    user_hook_entry_t entry = {id, hook, type, priority, true};
 
     user_hook_entry_t *existing = get_entry_by_id(id, db);
     if(existing) {
         // Replace the existing entry
         entry.priority = existing->priority;
-        memcpy(existing, &entry, sizeof(entry));
+        remove_entry(existing, db);
         // todo: don't mark modified if exactly identical
-    } else {
-        // Write to the end of the file
-        if(!ti_Write(&entry, sizeof(entry), 1, db)) {
-            ti_Close(db);
-            return HOOK_ERROR_INTERNAL_DATABASE_IO;
-        }
+    }
+    ti_Seek(0, SEEK_END, db);
+    // Write to the end of the file
+    if(!ti_Write(&entry, sizeof(entry) - 1, 1, db) ||
+       !ti_Write(description, strlen(description) + 1, 1, db)) {
+        ti_Close(db);
+        return HOOK_ERROR_INTERNAL_DATABASE_IO;
     }
 
     ti_Close(db);
@@ -195,7 +196,6 @@ hook_error_t hook_Uninstall(uint24_t id) {
     hook_error_t error = open_db(&db);
     if(error) return error;
 
-    user_hook_entry_t *db_end = ti_GetDataPtr(db);
     user_hook_entry_t *to_remove = get_entry_by_id(id, db);
 
     if(!to_remove) {
@@ -203,22 +203,11 @@ hook_error_t hook_Uninstall(uint24_t id) {
         return HOOK_SUCCESS;
     }
 
-    if(db_end - to_remove != 1) {
-        // Copy the last entry to the entry to remove
-        memcpy(to_remove, db_end - 1, sizeof(user_hook_entry_t));
-    }
-
-    // Remove last entry
-    size_t current_size = ti_GetSize(db);
-    size_t new_size = current_size - sizeof(user_hook_entry_t);
-    if(ti_Resize(new_size, db) != sizeof(user_hook_entry_t)) {
-        ti_Close(db);
-        return HOOK_ERROR_INTERNAL_DATABASE_IO;
-    }
+    error = remove_entry(to_remove, db);
 
     ti_Close(db);
     mark_database_modified();
-    return HOOK_SUCCESS;
+    return error;
 }
 
 // todo: check if the ID is an imported OS hook
@@ -417,6 +406,10 @@ hook_error_t hook_CheckValidity(uint24_t id) {
     return HOOK_SUCCESS;
 }
 
+user_hook_entry_t *get_next(user_hook_entry_t *entry) {
+    return (user_hook_entry_t*)&entry->description[strlen(entry->description) + 1];
+}
+
 user_hook_entry_t *get_entry_by_id(uint24_t id, ti_var_t db) {
     ti_Seek(sizeof(database_header_t), SEEK_SET, db);
     user_hook_entry_t *start = ti_GetDataPtr(db);
@@ -424,13 +417,24 @@ user_hook_entry_t *get_entry_by_id(uint24_t id, ti_var_t db) {
     ti_Seek(0, SEEK_END, db);
     user_hook_entry_t *end = ti_GetDataPtr(db);
 
-    for(user_hook_entry_t *current = start; current < end; current++) {
+    for(user_hook_entry_t *current = start; current < end; current = get_next(current)) {
         if(current->id == id) {
             return current;
         }
     }
 
     return NULL;
+}
+
+hook_error_t remove_entry(user_hook_entry_t *entry, ti_var_t db) {
+    void *next = get_next(entry);
+    size_t current_size = next - (void*)entry;
+    ti_Seek(0, SEEK_SET, db);
+    void *start = ti_GetDataPtr(db);
+    memmove(start + current_size, start, (void*)entry - start);
+    if(ti_Resize(ti_GetSize(db) - current_size, db) != current_size)
+        return HOOK_ERROR_INTERNAL_DATABASE_IO;
+    return HOOK_SUCCESS;
 }
 
 bool user_hook_valid(hook_t *hook) {
@@ -537,18 +541,16 @@ hook_error_t insert_existing(void) {
 
         mark_database_modified();
 
-        user_hook_entry_t entry = {type, *hook_addresses[type], type, 255, true, {0}};
+        user_hook_entry_t entry = {type, *hook_addresses[type], type, 255, true, ""};
 
         user_hook_entry_t *existing = get_entry_by_id(type, db);
         if(existing) {
-            // Replace the existing entry
-            memcpy(existing, &entry, sizeof(entry));
-        } else {
-            // Write to the end of the file
-            if(!ti_Write(&entry, sizeof(entry), 1, db)) {
-                ti_Close(db);
-                return HOOK_ERROR_INTERNAL_DATABASE_IO;
-            }
+            remove_entry(existing, db);
+        }
+        // Write to the end of the file
+        if(!ti_Write(&entry, sizeof(entry), 1, db)) {
+            ti_Close(db);
+            return HOOK_ERROR_INTERNAL_DATABASE_IO;
         }
 
         clear_hook(type);
@@ -588,15 +590,19 @@ void *flash_relocate(void *data, size_t size) {
 #ifndef NDEBUG
 void debug_print_db(void) {
     dbg_sprintf(dbgout, "----- DATABASE UPDATED -----\n");
-    ti_var_t db = ti_Open(DB_TEMP_NAME, "r");
+    ti_var_t db = open_db_readonly();
     void *ptr = ti_GetDataPtr(db);
     database_header_t header;
     ti_Read(&header, sizeof(header), 1, db);
-    user_hook_entry_t current_entry;
-    dbg_sprintf(dbgout, "DB: %p | Size: %u | Version: %u | Entry size: %u\n", ptr, ti_GetSize(db), header.version, sizeof(current_entry));
-    for(int i = 0; ti_Read(&current_entry, sizeof(current_entry), 1, db); i++) {
-        dbg_sprintf(dbgout, "Entry %u: id: %06X | hook: %p | type: %2u | priority: %3u | enabled: %c | description: %s\n",
-                i, current_entry.id, current_entry.hook, current_entry.type, current_entry.priority, current_entry.enabled ? 'T' : 'F', current_entry.description);
+
+    user_hook_entry_t *start = ti_GetDataPtr(db);
+    ti_Seek(0, SEEK_END, db);
+    user_hook_entry_t *end = ti_GetDataPtr(db);
+
+    dbg_sprintf(dbgout, "DB: %p | Size: %u | Version: %u\n", ptr, ti_GetSize(db), header.version);
+    for(user_hook_entry_t *current = start; current < end; current = get_next(current)) {
+        dbg_sprintf(dbgout, "id: %06X | hook: %p | type: %2u | priority: %3u | enabled: %c | description: %s\n",
+                current->id, current->hook, current->type, current->priority, current->enabled ? 'T' : 'F', current->description);
     }
     ti_Close(db);
 }
