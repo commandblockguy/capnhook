@@ -34,7 +34,6 @@ hook_error_t remove_entry(user_hook_entry_t *entry, ti_var_t db);
 bool user_hook_valid(hook_t *hook);
 hook_error_t init(void);
 hook_error_t open_db(ti_var_t *slot);
-ti_var_t open_db_readonly(void);
 hook_error_t insert_existing(void);
 void mark_database_modified(void);
 void *flash_relocate(void *data, size_t size);
@@ -56,15 +55,6 @@ extern hook_t **hook_addresses[HOOK_NUM_TYPES];
 bool initted = false;
 bool existing_checked = false;
 bool database_modified = false;
-
-hook_error_t hook_Discard(void) {
-    ti_Delete(DB_TEMP_NAME);
-
-    initted = false;
-    database_modified = false;
-
-    return HOOK_SUCCESS;
-}
 
 void sort_by_priority(hook_t **hooks, uint8_t *priorities, uint8_t num_hooks) {
     for(uint8_t i = 0; i < num_hooks - 1; i++) {
@@ -229,151 +219,6 @@ hook_error_t hook_Disable(uint24_t id) {
     return HOOK_SUCCESS;
 }
 
-hook_error_t hook_IsInstalled(uint24_t id, bool *result) {
-    ti_var_t db = open_db_readonly();
-    if(!db) {
-        *result = false;
-        return HOOK_SUCCESS;
-    }
-
-    if(get_entry_by_id(id, db)) {
-        *result = true;
-    } else {
-        *result = false;
-    }
-
-    ti_Close(db);
-    return HOOK_SUCCESS;
-}
-
-hook_error_t hook_GetHook(uint24_t id, hook_t **result) {
-    ti_var_t db = open_db_readonly();
-    if(!db) {
-        *result = NULL;
-        return HOOK_ERROR_INTERNAL_DATABASE_IO;
-    }
-
-    user_hook_entry_t *entry = get_entry_by_id(id, db);
-
-    if(!entry) {
-        ti_Close(db);
-        *result = NULL;
-        return HOOK_ERROR_NO_MATCHING_ID;
-    }
-
-    *result = entry->hook;
-
-    ti_Close(db);
-    return HOOK_SUCCESS;
-}
-
-hook_error_t hook_GetType(uint24_t id, hook_type_t *result) {
-    ti_var_t db = open_db_readonly();
-    if(!db) {
-        *result = HOOK_TYPE_UNKNOWN;
-        return HOOK_ERROR_INTERNAL_DATABASE_IO;
-    }
-
-    user_hook_entry_t *entry = get_entry_by_id(id, db);
-
-    if(!entry) {
-        ti_Close(db);
-        *result = HOOK_TYPE_UNKNOWN;
-        return HOOK_ERROR_NO_MATCHING_ID;
-    }
-
-    *result = entry->type;
-
-    ti_Close(db);
-    return HOOK_SUCCESS;
-}
-
-hook_error_t hook_GetPriority(uint24_t id, uint8_t *result) {
-    ti_var_t db = open_db_readonly();
-    if(!db) {
-        ti_Close(db);
-        *result = 0;
-        return HOOK_ERROR_INTERNAL_DATABASE_IO;
-    }
-
-    user_hook_entry_t *entry = get_entry_by_id(id, db);
-
-    if(!entry) {
-        ti_Close(db);
-        *result = 0;
-        return HOOK_ERROR_NO_MATCHING_ID;
-    }
-
-    *result = entry->priority;
-
-    ti_Close(db);
-    return HOOK_SUCCESS;
-}
-
-hook_error_t hook_IsEnabled(uint24_t id, bool *result) {
-    ti_var_t db = open_db_readonly();
-    if(!db) {
-        *result = false;
-        return HOOK_ERROR_INTERNAL_DATABASE_IO;
-    }
-
-    user_hook_entry_t *entry = get_entry_by_id(id, db);
-
-    if(!entry) {
-        ti_Close(db);
-        *result = false;
-        return HOOK_ERROR_NO_MATCHING_ID;
-    }
-
-    *result = entry->enabled;
-
-    ti_Close(db);
-    return HOOK_SUCCESS;
-}
-
-hook_error_t hook_GetDescription(uint24_t id, char **result) {
-    ti_var_t db = open_db_readonly();
-    if(!db) {
-        *result = NULL;
-        return HOOK_ERROR_INTERNAL_DATABASE_IO;
-    }
-
-    user_hook_entry_t *entry = get_entry_by_id(id, db);
-
-    if(!entry) {
-        ti_Close(db);
-        *result = NULL;
-        return HOOK_ERROR_NO_MATCHING_ID;
-    }
-
-    *result = entry->description;
-
-    ti_Close(db);
-    return HOOK_SUCCESS;
-}
-
-hook_error_t hook_CheckValidity(uint24_t id) {
-    ti_var_t db = open_db_readonly();
-    if(!db) {
-        return HOOK_ERROR_INTERNAL_DATABASE_IO;
-    }
-
-    user_hook_entry_t *entry = get_entry_by_id(id, db);
-
-    if(!entry) {
-        ti_Close(db);
-        return HOOK_ERROR_NO_MATCHING_ID;
-    }
-
-    if(!user_hook_valid(entry->hook)) {
-        ti_Close(db);
-        return HOOK_ERROR_INVALID_USER_HOOK;
-    }
-
-    ti_Close(db);
-    return HOOK_SUCCESS;
-}
-
 user_hook_entry_t *get_next(user_hook_entry_t *entry) {
     return (user_hook_entry_t*)&entry->description[strlen(entry->description) + 1];
 }
@@ -417,14 +262,6 @@ hook_error_t open_db(ti_var_t *slot) {
     *slot = ti_Open(DB_TEMP_NAME, "r+");
     if(!*slot) return HOOK_ERROR_INTERNAL_DATABASE_IO;
     return HOOK_SUCCESS;
-}
-
-ti_var_t open_db_readonly(void) {
-    ti_var_t slot = ti_Open(DB_TEMP_NAME, "r");
-    if(!slot) {
-        slot = ti_Open(DB_NAME, "r");
-    }
-    return slot;
 }
 
 hook_error_t insert_existing(void) {
@@ -492,7 +329,10 @@ void *flash_relocate(void *data, size_t size) {
 #ifndef NDEBUG
 void debug_print_db(void) {
     dbg_sprintf(dbgout, "----- DATABASE UPDATED -----\n");
-    ti_var_t db = open_db_readonly();
+    ti_var_t db = ti_Open(DB_TEMP_NAME, "r");
+    if(!db) {
+        db = ti_Open(DB_NAME, "r");
+    }
     void *ptr = ti_GetDataPtr(db);
     database_header_t header;
     ti_Read(&header, sizeof(header), 1, db);
