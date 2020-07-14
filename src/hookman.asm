@@ -1,5 +1,7 @@
 public _hook_Sync
 public _hook_Discard
+public _hook_Install
+public _hook_Uninstall
 public _hook_SetPriority
 public _hook_Enable
 public _hook_Disable
@@ -40,10 +42,13 @@ extern _install_hooks
 
 include	"hook_equates.inc"
 
+_strcpy			equ	$0000CC
 _GetCSC			equ	$02014C
 _Mov9ToOP1		equ	$020320
 _ChkFindSym		equ	$02050C
+_InsertMem		equ	$020514
 _EnoughMem		equ	$02051C
+_DelMem			equ	$020590
 _PopOP1			equ	$0205C4
 _PushOP1		equ	$020628
 _CreateAppVar		equ	$021330
@@ -153,6 +158,110 @@ _hook_Discard:
 	xor	a,a
 	ld	(_initted),a
 	ld	(_database_modified),a
+	ret
+
+_hook_Install:
+	ld	iy,0
+	add	iy,sp
+
+	ld	a,(iy+9) ; check that the type is valid
+	cp	a,23
+	ld	a,HOOK_ERROR_UNKNOWN_TYPE
+	ret	nc
+
+	ld	hl,(iy+6)
+	ld	a,(hl)
+	cp	a,$83
+	ld	a,HOOK_ERROR_INVALID_USER_HOOK
+	ret	nz
+
+	ld	hl,(iy+15)
+	xor	a,a
+	ld	bc,0
+	cpir
+	or	a,a
+	sbc	hl,hl
+	sbc	hl,bc
+	or	a,h ; a is 0
+	ld	a,HOOK_ERROR_DESCRIPTION_TOO_LONG
+	ret	nz
+	push	ix,hl
+
+	ld	bc,9 ; size of entry not including description
+	add	hl,bc
+	call	_EnoughMem
+	ld	a,HOOK_ERROR_INTERNAL_DATABASE_IO
+	jq	c,.pop_exit
+
+	push	iy,de ; delete existing
+	ld	bc,(iy+3) ; id
+	call	get_entry_rw
+	pop	de,iy
+	push	iy,de,hl
+	jr	nc,.removed
+	ld	a,(ix+7) ; set new priority to old priority
+	ld	(iy+12),a
+	call	remove_entry
+.removed:
+	pop	hl,de
+
+	ld	bc,5
+	add	hl,bc
+	ex	hl,de
+	ld	iy,flags
+	push	hl
+	call	_InsertMem
+	pop	bc,iy
+
+	push	de
+	pop	ix
+
+	ld	hl,0
+	ld	l,(ix-5)
+	ld	h,(ix-4)
+	add	hl,bc
+	ld	(ix-5),l
+	ld	(ix-4),h
+
+	ld	bc,(iy+3) ; id
+	ld	(ix),bc
+	ld	bc,(iy+6) ; hook
+	ld	(ix+3),bc
+	ld	a,(iy+9) ; type
+	ld	(ix+6),a
+	ld	a,(iy+12) ; priority
+	ld	(ix+7),a
+	ld	a,1 ; enabled
+	ld	(ix+8),a
+
+	lea	ix,ix+9
+	push	ix
+	pop	de,bc,ix
+	ld	hl,(iy+15)
+	ldir
+
+	ld	a,1
+	ld	(_database_modified),a
+	xor	a,a
+	ret
+.pop_exit:
+	pop	bc,ix
+	ret
+
+_hook_Uninstall:
+	pop	de,bc
+	push	bc,de,ix
+	call	get_entry_rw
+	ld	a,HOOK_ERROR_NO_MATCHING_ID
+	jq	nc,.exit
+
+	call	remove_entry
+
+	ld	a,1
+	ld	(_database_modified),a
+	xor	a,a
+.exit:
+	pop	ix
 	ret
 
 _hook_SetPriority:
@@ -508,6 +617,29 @@ get_entry_rw:
 	pop	ix
 	call	get_entry
 	pop	hl
+	ret
+
+; ix: entry
+; hl: pointer to size
+remove_entry:
+	push	hl,ix
+	call	get_next
+	push	ix
+	pop	hl,de
+	; c is reset from get_next
+	sbc	hl,de ; hl: size of entry to remove
+	ex	hl,de ; hl: pointer, de: size
+	push	de
+	call	_DelMem
+	pop	de
+	pop	ix ; hl: pointer to size
+	ld	hl,0
+	ld	l,(ix)
+	ld	h,(ix+1)
+	or	a,a
+	sbc	hl,de
+	ld	(ix),l
+	ld	(ix+1),h
 	ret
 
 _install_main_executor:

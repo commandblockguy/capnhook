@@ -116,58 +116,6 @@ hook_error_t install_hooks(void) {
     return HOOK_SUCCESS;
 }
 
-hook_error_t hook_Install(uint24_t id, hook_t *hook, hook_type_t type, uint8_t priority, const char *description) {
-    if(type >= HOOK_NUM_TYPES) return HOOK_ERROR_UNKNOWN_TYPE;
-    if(!user_hook_valid(hook)) return HOOK_ERROR_INVALID_USER_HOOK;
-
-    size_t description_length = strlen(description);
-    if(description_length > 255) return HOOK_ERROR_DESCRIPTION_TOO_LONG;
-
-    ti_var_t db;
-    hook_error_t err = open_db(&db);
-    if(err) return err;
-
-    user_hook_entry_t entry = {id, hook, type, priority, true};
-
-    user_hook_entry_t *existing = get_entry_by_id(id, db);
-    if(existing) {
-        // Replace the existing entry
-        entry.priority = existing->priority;
-        remove_entry(existing, db);
-        // todo: don't mark modified if exactly identical
-    }
-    ti_Seek(0, SEEK_END, db);
-    // Write to the end of the file
-    if(!ti_Write(&entry, sizeof(entry) - 1, 1, db) ||
-       !ti_Write(description, strlen(description) + 1, 1, db)) {
-        ti_Close(db);
-        return HOOK_ERROR_INTERNAL_DATABASE_IO;
-    }
-
-    ti_Close(db);
-    mark_database_modified();
-    return HOOK_SUCCESS;
-}
-
-hook_error_t hook_Uninstall(uint24_t id) {
-    ti_var_t db;
-    hook_error_t error = open_db(&db);
-    if(error) return error;
-
-    user_hook_entry_t *to_remove = get_entry_by_id(id, db);
-
-    if(!to_remove) {
-        ti_Close(db);
-        return HOOK_SUCCESS;
-    }
-
-    error = remove_entry(to_remove, db);
-
-    ti_Close(db);
-    mark_database_modified();
-    return error;
-}
-
 user_hook_entry_t *get_next(user_hook_entry_t *entry) {
     return (user_hook_entry_t*)&entry->description[strlen(entry->description) + 1];
 }
