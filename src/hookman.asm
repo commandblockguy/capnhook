@@ -37,8 +37,8 @@ extern _initted
 extern _existing_checked
 extern _database_modified
 
-extern _insert_existing
 extern _install_hooks
+extern _debug_print_db
 
 include	"hook_equates.inc"
 
@@ -88,7 +88,9 @@ open_dbg:
 _hook_Sync:
 	ld	a,(_existing_checked)
 	or	a,a
+	push	ix
 	call	z,_init
+	pop	ix
 
 	ld	a,(_initted)
 	or	a,a
@@ -506,9 +508,7 @@ _init:
 	bit	0,(hl)
 	jq	nz,.checked_existing
 	set	0,(hl)
-	call	_insert_existing
-	or	a,a
-	ret	c
+	call	insert_existing
 .checked_existing:
 	ld	a,1
 	ld	(_initted),a
@@ -641,6 +641,84 @@ remove_entry:
 	ld	(ix),l
 	ld	(ix+1),h
 	ret
+
+insert_existing:
+	ld	bc,23 ; num types
+	push	bc
+.loop:
+	pop	bc
+	dec	c
+	ret	m
+	push	bc
+
+	call	_check_hook
+	or	a,a
+	jq	z,.loop
+
+	pop	bc ; check if hook is valid
+	push	bc
+	ld	hl,_hook_addresses
+	add	hl,bc
+	add	hl,bc
+	add	hl,bc
+	ld	hl,(hl)
+	ld	hl,(hl)
+	push	hl
+	pop	de
+	ld	a,(hl)
+	cp	a,$83
+	jq	nz,.loop
+	dec	hl ; check if this is one of our own hooks
+	ld	a,(hl)
+	cp	a,'m'
+	jq	z,.loop
+
+	pop	bc ; set types in entry
+	push	bc
+	ld	ix,.entry
+	ld	(ix),c
+	ld	(ix+3),de ; pointer to hook
+	ld	(ix+6),c
+
+	ld	hl,10 ; don't do anything if there's insufficient memory
+	call	_EnoughMem ; todo: don't do this check if there's an existing entry with this ID?
+	jq	c,.loop
+
+	call	get_entry_rw
+	push	hl
+	call	c,remove_entry
+	pop	ix
+
+	push	ix
+	ld	de,10
+	ld	l,(ix)
+	ld	h,(ix+1)
+	add	hl,de
+	ld	(ix),l
+	ld	(ix+1),h
+	pop	hl
+
+	ld	bc,5
+	add	hl,bc
+	ex	hl,de
+	push	de
+	ld	iy,flags
+	call	_InsertMem
+
+	pop	de ; actually copy entry
+	ld	hl,.entry
+	ld	bc,10
+	ldir
+
+	ld	a,1
+	ld	(_database_modified),a
+
+	; todo: remove
+	call	_debug_print_db
+
+	jq	.loop
+.entry:
+	db	0,0,0, 0,0,0, 0, $ff, 1, 0
 
 _install_main_executor:
 	ld	hl,main_executor_size

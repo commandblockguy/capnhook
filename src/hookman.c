@@ -120,87 +120,8 @@ user_hook_entry_t *get_next(user_hook_entry_t *entry) {
     return (user_hook_entry_t*)&entry->description[strlen(entry->description) + 1];
 }
 
-user_hook_entry_t *get_entry_by_id(uint24_t id, ti_var_t db) {
-    ti_Seek(sizeof(database_header_t), SEEK_SET, db);
-    user_hook_entry_t *start = ti_GetDataPtr(db);
-
-    ti_Seek(0, SEEK_END, db);
-    user_hook_entry_t *end = ti_GetDataPtr(db);
-
-    for(user_hook_entry_t *current = start; current < end; current = get_next(current)) {
-        if(current->id == id) {
-            return current;
-        }
-    }
-
-    return NULL;
-}
-
-hook_error_t remove_entry(user_hook_entry_t *entry, ti_var_t db) {
-    void *next = get_next(entry);
-    size_t current_size = next - (void*)entry;
-    ti_Seek(0, SEEK_SET, db);
-    void *start = ti_GetDataPtr(db);
-    memmove(start + current_size, start, (void*)entry - start);
-    if(ti_Resize(ti_GetSize(db) - current_size, db) != current_size)
-        return HOOK_ERROR_INTERNAL_DATABASE_IO;
-    return HOOK_SUCCESS;
-}
-
 bool user_hook_valid(hook_t *hook) {
     return *(uint8_t*)hook == 0x83;
-}
-
-hook_error_t open_db(ti_var_t *slot) {
-    if(!initted) {
-        hook_error_t err = init();
-        if(err) return err;
-    }
-    *slot = ti_Open(DB_TEMP_NAME, "r+");
-    if(!*slot) return HOOK_ERROR_INTERNAL_DATABASE_IO;
-    return HOOK_SUCCESS;
-}
-
-hook_error_t insert_existing(void) {
-    ti_var_t db;
-    hook_error_t error = open_db(&db);
-    if(error) return error;
-
-    // Use the type as an ID
-    for(int type = 0; type < HOOK_NUM_TYPES; type++) {
-        // Check if the hook type is enabled
-        if(!check_hook(type)) continue;
-        // Check if the hook pointer is valid
-        if(*(uint8_t*)*(hook_addresses[type]) != 0x83) continue;
-        // Check if this is already one of our own hooks
-        if(*((char*)*hook_addresses[type] - 1) == 'm') continue;
-
-        mark_database_modified();
-
-        user_hook_entry_t entry = {type, *hook_addresses[type], type, 255, true, ""};
-
-        user_hook_entry_t *existing = get_entry_by_id(type, db);
-        if(existing) {
-            remove_entry(existing, db);
-        }
-        // Write to the end of the file
-        if(!ti_Write(&entry, sizeof(entry), 1, db)) {
-            ti_Close(db);
-            return HOOK_ERROR_INTERNAL_DATABASE_IO;
-        }
-
-        clear_hook(type);
-    }
-
-    ti_Close(db);
-    return HOOK_SUCCESS;
-}
-
-void mark_database_modified(void) {
-    database_modified = true;
-#ifndef NDEBUG
-    debug_print_db();
-#endif
 }
 
 // todo: probably use a more sophisticated way of doing this, as Mateo mentioned
