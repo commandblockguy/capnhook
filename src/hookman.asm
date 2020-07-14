@@ -1,5 +1,8 @@
 public _hook_Sync
 public _hook_Discard
+public _hook_SetPriority
+public _hook_Enable
+public _hook_Disable
 public _hook_GetHook
 public _hook_GetType
 public _hook_GetPriority
@@ -150,6 +153,59 @@ _hook_Discard:
 	xor	a,a
 	ld	(_initted),a
 	ld	(_database_modified),a
+	ret
+
+_hook_SetPriority:
+	pop	de,bc,hl
+	push	hl,bc,de,ix,hl
+	call	get_entry_rw
+	pop	bc
+	ld	a,HOOK_ERROR_NO_MATCHING_ID
+	jq	nc,.exit
+
+	; todo: check that this is not an imported OS hook
+
+	ld	a,1
+	ld	(_database_modified),a ; todo: only mark modified if changed
+	ld	(ix+7),c
+
+	xor	a,a
+.exit:
+	pop	ix
+	ret
+
+_hook_Enable:
+	pop	de,bc
+	push	bc,de,ix
+	call	get_entry_rw
+	ld	a,HOOK_ERROR_NO_MATCHING_ID
+	jq	nc,.exit
+
+	; todo: check that hook is still valid
+
+	ld	a,1
+	ld	(_database_modified),a ; todo: only mark modified if previously disabled
+	ld	(ix+8),a
+
+	xor	a,a
+.exit:
+	pop	ix
+	ret
+
+_hook_Disable:
+	pop	de,bc
+	push	bc,de,ix
+	call	get_entry_rw
+	ld	a,HOOK_ERROR_NO_MATCHING_ID
+	jq	nc,.exit
+
+	ld	a,1
+	ld	(_database_modified),a ; todo: only mark modified if previously enabled
+
+	xor	a,a
+	ld	(ix+8),a
+.exit:
+	pop	ix
 	ret
 
 _hook_GetHook:
@@ -428,6 +484,30 @@ get_entry_readonly:
 	ret
 .pop_ret:
 	pop	bc
+	ret
+
+; bc: id
+; returns entry in ix
+; returns pointer to var size in hl
+; carry flag set if found
+get_entry_rw:
+	push	bc
+	ld	a,(_initted)
+	or	a,a
+	call	z,_init
+
+	ld	hl,temp_db_name
+	call	_Mov9ToOP1
+	call	_ChkFindSym
+	pop	bc
+	ccf
+	ret	nc
+
+	ex	hl,de
+	push	hl,hl
+	pop	ix
+	call	get_entry
+	pop	hl
 	ret
 
 _install_main_executor:

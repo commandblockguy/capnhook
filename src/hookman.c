@@ -168,57 +168,6 @@ hook_error_t hook_Uninstall(uint24_t id) {
     return error;
 }
 
-// todo: check if the ID is an imported OS hook
-hook_error_t hook_SetPriority(uint24_t id, uint8_t priority) {
-    ti_var_t db;
-    hook_error_t error = open_db(&db);
-    if(error) return error;
-
-    user_hook_entry_t *entry = get_entry_by_id(id, db);
-
-    if(!entry) return HOOK_ERROR_NO_MATCHING_ID;
-
-    entry->priority = priority;
-
-    ti_Close(db);
-    mark_database_modified();
-    return HOOK_SUCCESS;
-}
-
-hook_error_t hook_Enable(uint24_t id) {
-    ti_var_t db;
-    hook_error_t error = open_db(&db);
-    if(error) return error;
-
-    user_hook_entry_t *entry = get_entry_by_id(id, db);
-
-    if(!entry) return HOOK_ERROR_NO_MATCHING_ID;
-
-    if(!user_hook_valid(entry->hook)) return HOOK_ERROR_INVALID_USER_HOOK;
-
-    entry->enabled = true;
-
-    ti_Close(db);
-    mark_database_modified();
-    return HOOK_SUCCESS;
-}
-
-hook_error_t hook_Disable(uint24_t id) {
-    ti_var_t db;
-    hook_error_t error = open_db(&db);
-    if(error) return error;
-
-    user_hook_entry_t *entry = get_entry_by_id(id, db);
-
-    if(!entry) return HOOK_SUCCESS;
-
-    entry->enabled = false;
-
-    ti_Close(db);
-    mark_database_modified();
-    return HOOK_SUCCESS;
-}
-
 user_hook_entry_t *get_next(user_hook_entry_t *entry) {
     return (user_hook_entry_t*)&entry->description[strlen(entry->description) + 1];
 }
