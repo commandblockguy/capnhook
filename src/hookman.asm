@@ -32,6 +32,7 @@ extern	individual_executor_jump
 extern	individual_executor_size
 
 extern _flash_relocate
+extern _sort_by_priority
 
 extern _initted
 extern _existing_checked
@@ -143,7 +144,9 @@ _hook_Sync:
 	ld	iy,flags
 	call	_Arc_Unarc
 
-	call	_install_hooks
+	push	ix
+	call	install_hooks
+	pop	ix
 	or	a,a
 	ret	nz
 
@@ -567,11 +570,9 @@ get_entry:
 	call	get_next
 	jq	.loop
 
-; bc: id
-; returns entry in ix
-; carry flag set if found
-get_entry_readonly:
-	push	bc
+; returns pointer to size bytes in ix
+; carry flag set if success
+open_readonly:
 	ld	hl,temp_db_name
 	call	_Mov9ToOP1
 	call	_ChkFindSym
@@ -581,19 +582,25 @@ get_entry_readonly:
 	call	_Mov9ToOP1
 	call	_ChkFindSym
 	ccf
-	jq	nc,.pop_ret
+	ret	nc
 .found:
 	call	_ChkInRam
 	ex	hl,de
 	call	nz,skip_archive_header
-	pop	bc
 	push	hl
 	pop	ix
-	call	get_entry
+	scf
 	ret
-.pop_ret:
+
+; bc: id
+; returns entry in ix
+; carry flag set if found
+get_entry_readonly:
+	push	bc
+	call	open_readonly
 	pop	bc
-	ret
+	ret	nc
+	jq	get_entry
 
 ; bc: id
 ; returns entry in ix
@@ -720,6 +727,134 @@ insert_existing:
 .entry:
 	db	0,0,0, 0,0,0, 0, $ff, 1, 0
 
+install_hooks:
+	call	_install_main_executor
+	call	open_readonly
+	ld	hl,HOOK_ERROR_INTERNAL_DATABASE_IO
+	ret	nc
+	push	ix
+	ld	bc,23 ; num types
+	push	bc
+.type_loop:
+	pop	bc
+	dec	c
+	pop	ix
+	ld	hl,HOOK_SUCCESS
+	ret	m
+	push	ix,bc
+
+	xor	a,a
+	ld	(.num_hooks),a
+
+	ld	de,0
+	ld	e,(ix)
+	ld	d,(ix+1)
+	lea	iy,ix+2
+	add	iy,de ; iy: end of file
+	push	iy
+	pop	de
+	lea	ix,ix+5 ; ix: pointer to first entry
+.entry_loop:
+	or	a,a
+	push	ix
+	pop	hl
+	sbc	hl,de
+	jq	nc,.entry_loop_break
+
+	pop	bc
+	push	bc
+	ld	a,(ix+6) ; type
+	cp	a,c
+	jq	nz,.skip
+
+	ld	hl,(ix+3)
+	ld	a,$83
+	cp	a,(hl)
+	jq	nz,.skip
+
+	bit	0,(ix+8)
+	jq	z,.skip
+
+	ld	hl,.num_hooks
+	ld	c,(hl)
+	ld	hl,hooks
+	add	hl,bc
+	add	hl,bc
+	add	hl,bc
+	push	bc
+	ld	bc,(ix+3) ; hook ptr
+	ld	(hl),bc
+	pop	bc
+	ld	hl,priorities
+	add	hl,bc
+	ld	a,(ix+7)
+	ld	(hl),a
+
+	ld	a,(.num_hooks)
+	inc	a
+	ld	(.num_hooks),a
+	cp	a,$FF
+	jq	z,.entry_loop_break
+.skip:
+	call	get_next
+	jq	.entry_loop
+
+.entry_loop_break:
+	ld	a,(.num_hooks)
+	or	a,a
+	jq	z,.type_loop
+
+	ld	bc,0
+	ld	c,a
+	push	bc ; num_hooks
+	ld	bc,priorities
+	push	bc
+	ld	bc,hooks
+	push	bc
+	call	_sort_by_priority
+	pop	bc
+	pop	bc
+	pop	bc
+
+	ld	hl,.num_hooks
+	ld	bc,0
+	ld	c,(hl)
+	push	bc
+	pop	hl
+	add	hl,bc
+	add	hl,bc
+	push	hl ; 3 * (.num_hooks)
+	ld	bc,hooks
+	add	hl,bc
+	ld	bc,0 ; add null terminator
+	ld	(hl),bc
+
+	pop	hl
+	inc	hl
+	inc	hl
+	inc	hl
+	push	hl
+	ld	hl,hooks
+	push	hl
+
+	call	_flash_relocate
+	pop	bc,bc,bc
+	push	bc,hl,bc
+	call	_install_individual_executor
+	pop	bc,bc
+
+	jq	.type_loop
+.num_hooks:
+	rb	1
+
+; todo: can't directly copy this - go back to two arrays?
+; 256 4-byte entries: 1 byte priority, 3-byte hook ptr
+priorities:
+	rb	256
+hooks:
+	rb	256 * 3
+
+; todo: check if main executor is already installed?
 _install_main_executor:
 	ld	hl,main_executor_size
 	push	hl
