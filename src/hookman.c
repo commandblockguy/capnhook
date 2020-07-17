@@ -24,9 +24,6 @@ typedef struct {
 
 user_hook_entry_t *get_next(user_hook_entry_t *entry);
 
-bool check_hook(uint24_t type);
-void clear_hook(uint24_t type);
-
 // Global state
 bool initted = false;
 bool existing_checked = false;
@@ -52,26 +49,6 @@ void sort_by_priority(hook_t **hooks, uint8_t *priorities, uint8_t num_hooks) {
 
 user_hook_entry_t *get_next(user_hook_entry_t *entry) {
     return (user_hook_entry_t*)&entry->description[strlen(entry->description) + 1];
-}
-
-// todo: probably use a more sophisticated way of doing this, as Mateo mentioned
-// if so, maybe also provide that method to users rather than leaving memory allocation up to them
-void *flash_relocate(void *data, size_t size) {
-    void *install_location;
-    if(!ti_ArchiveHasRoom(size)) return NULL;
-    ti_var_t slot = ti_Open("TMP", "w");
-    if(!slot) return NULL;
-    if(!ti_Write(data, size, 1, slot)) return NULL;
-    if(!ti_SetArchiveStatus(true, slot)) return NULL;
-    ti_Rewind(slot);
-    install_location = ti_GetDataPtr(slot);
-    ti_Close(slot);
-
-    ti_Delete("TMP");
-
-    dbg_sprintf(dbgout, "Relocated %u bytes from %p to %p\n", size, data, install_location);
-
-    return install_location;
 }
 
 #ifndef NDEBUG

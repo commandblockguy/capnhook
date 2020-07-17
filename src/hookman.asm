@@ -12,7 +12,6 @@ public _hook_IsInstalled
 public _hook_IsEnabled
 public _hook_GetDescription
 public _hook_CheckValidity
-public _init
 
 public	_set_hook_by_type
 public	_install_main_executor
@@ -31,14 +30,12 @@ extern	individual_executor_table
 extern	individual_executor_jump
 extern	individual_executor_size
 
-extern _flash_relocate
 extern _sort_by_priority
 
 extern _initted
 extern _existing_checked
 extern _database_modified
 
-extern _install_hooks
 extern _debug_print_db
 
 include	"hook_equates.inc"
@@ -116,7 +113,9 @@ _hook_Sync:
 
 	ld	bc,12
 	add	hl,bc
-	call	_FindFreeArcSpot ; no idea how this call works, and am just copying ti_ArchiveHasRoom
+	push	hl
+	pop	bc
+	call	_FindFreeArcSpot
 	ld	a,HOOK_ERROR_NEEDS_GC
 	ret	z
 
@@ -837,7 +836,7 @@ install_hooks:
 	ld	hl,hooks
 	push	hl
 
-	call	_flash_relocate
+	call	flash_relocate
 	pop	bc,bc,bc
 	push	bc,hl,bc
 	call	_install_individual_executor
@@ -847,12 +846,55 @@ install_hooks:
 .num_hooks:
 	rb	1
 
-; todo: can't directly copy this - go back to two arrays?
-; 256 4-byte entries: 1 byte priority, 3-byte hook ptr
 priorities:
 	rb	256
 hooks:
 	rb	256 * 3
+
+; todo: should I use actual relocation for this?
+; also, should I expose this function to the user?
+flash_relocate:
+	pop	de,bc,hl ; hl = size
+	push	hl,bc,de,bc
+	ld	iy,flags
+
+	call	_EnoughMem
+	jq	c,.ret_null
+	push	de
+	ld	hl,12
+	add	hl,de
+	push	hl
+	pop	bc
+	call	_FindFreeArcSpot
+	jq	z,.ret_null
+
+	ld	hl,temp_var_name
+	call	_Mov9ToOP1
+	call	_PushOP1
+
+	pop	hl ; hl = size
+	push	hl
+	call	_CreateAppVar
+	pop	bc ; todo: bc already contains size?
+	inc	de
+	inc	de
+	pop	hl ; hl = data to copy
+	ldir
+
+	call	_PopOP1
+	call	_Arc_Unarc
+
+	call	_ChkFindSym
+	push	de
+	call	_DelVarArc
+	pop	hl
+	ld	bc,15 ; skip archive header
+	add	hl,bc
+	ret
+.ret_null:
+	pop	hl
+	ld	hl,0
+	ret
 
 ; todo: check if main executor is already installed?
 _install_main_executor:
@@ -867,7 +909,7 @@ _install_main_executor:
 
 	ld	bc,main_executor
 	push	bc
-	call	_flash_relocate
+	call	flash_relocate
 	pop	bc,bc
 	ret
 
@@ -887,7 +929,7 @@ _install_individual_executor:
 	push	bc
 	ld	bc,individual_executor
 	push	bc
-	call	_flash_relocate
+	call	flash_relocate
 	pop	bc,bc
 
 	inc	hl
@@ -898,7 +940,7 @@ _install_individual_executor:
 	;inc	de
 	;scf
 	;sbc	hl,hl
-	;ld	 (hl),3
+	;ld	(hl),3
 	;push	de
 	;pop	hl
 	;dec	hl
@@ -910,6 +952,7 @@ _install_individual_executor:
 	add	ix,bc
 	ld	ix,(ix)
 
+	ld	iy,flags
 	call	jmp_ix
 
 	pop	ix
@@ -1075,3 +1118,5 @@ temp_db_name:
 	db	AppVarObj,"HOOKTMP",0
 db_name:
 	db	AppVarObj,"HOOKSDB",0
+temp_var_name:
+	db	AppVarObj,"TMP",0,0,0,0,0
