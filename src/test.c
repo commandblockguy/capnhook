@@ -21,6 +21,8 @@ void clear_hook(uint24_t type);
 
 void sort_by_priority(hook_t **hooks, uint8_t *priorities, uint8_t num_hooks);
 
+void debug_print_db(void);
+
 #define ASSERT(cond) if(!(cond)) {dbg_sprintf((char*)dbgout, "Assertion failed on line %u\n", __LINE__); return false;} else dbg_sprintf((char*)dbgout, "Assertion passed on line %u\n", __LINE__)
 #define ASSERT_EQUAL(var, known) if(var != known) {dbg_sprintf((char*)dbgout, "Assertion failed on line %u, value 0x%X\n", __LINE__, (int)var); return false;} else dbg_sprintf((char*)dbgout, "Assertion passed on line %u\n", __LINE__)
 
@@ -36,6 +38,7 @@ bool check_tests(void) {
     ti_CloseAll();
     ti_Delete("HOOKSDB");
     ti_Delete("HOOKTMP");
+    debug_print_db();
 
     hook_t *test_hooks[5];
     uint8_t test_priorities[5] = {5, 4, 2, 3, 1};
@@ -59,6 +62,7 @@ bool check_tests(void) {
     // Install test hooks
     err = hook_Install(0xFF0001, &hook_1, HOOK_TYPE_RAW_KEY, 10, "Test Hook 1");
     ASSERT_EQUAL(err, HOOK_SUCCESS);
+    debug_print_db();
 
     err = hook_IsInstalled(0xFF0001, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
@@ -78,6 +82,7 @@ bool check_tests(void) {
 
     err = hook_Install(0xFF0002, &hook_2, HOOK_TYPE_RAW_KEY, 20, "Test Hook 2");
     ASSERT_EQUAL(err, HOOK_SUCCESS);
+    debug_print_db();
 
     err = hook_IsInstalled(0xFF0002, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
@@ -85,6 +90,7 @@ bool check_tests(void) {
 
     err = hook_Install(0xFF0003, &hook_3, HOOK_TYPE_RAW_KEY, 25, "Test Hook 2");
     ASSERT_EQUAL(err, HOOK_SUCCESS);
+    debug_print_db();
 
     err = hook_IsInstalled(0xFF0002, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
@@ -110,6 +116,7 @@ bool check_tests(void) {
     // Change priority
     err = hook_SetPriority(0xFF0001, 15);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
+    debug_print_db();
     err = hook_GetPriority(0xFF0001, &priority);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(priority, 15);
@@ -117,6 +124,7 @@ bool check_tests(void) {
     // Test reinstalling with the same ID
     err = hook_Install(0xFF0001, &hook_1, HOOK_TYPE_RAW_KEY, 10, "Test Hook 1 - Alt");
     ASSERT_EQUAL(err, HOOK_SUCCESS);
+    debug_print_db();
 
     err = hook_GetPriority(0xFF0001, &priority);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
@@ -160,6 +168,7 @@ bool check_tests(void) {
 
     existing_checked = false;
     ASSERT_EQUAL(hook_Sync(), HOOK_SUCCESS);
+    debug_print_db();
     err = hook_IsInstalled(HOOK_TYPE_RAW_KEY, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(installed, true);
@@ -180,6 +189,7 @@ bool check_tests(void) {
     // Disable a hook
     err = hook_Disable(0xFF0001);
     ASSERT_EQUAL(err, 0);
+    debug_print_db();
 
     err = hook_IsEnabled(0xFF0001, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
@@ -196,6 +206,7 @@ bool check_tests(void) {
     // Re-enable hook
     err = hook_Enable(0xFF0001);
     ASSERT_EQUAL(err, 0);
+    debug_print_db();
 
     err = hook_IsEnabled(0xFF0001, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
@@ -226,6 +237,7 @@ bool check_tests(void) {
     // Uninstall hook
     err = hook_Uninstall(0xFF0001);
     ASSERT_EQUAL(err, 0);
+    debug_print_db();
 
     err = hook_IsInstalled(0xFF0001, &installed);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
@@ -253,4 +265,47 @@ int main(void) {
     }
 
     while(!os_GetCSC());
+}
+
+#define DB_NAME "HOOKSDB"
+#define DB_TEMP_NAME "HOOKTMP"
+
+typedef struct {
+    uint24_t version;
+} database_header_t;
+
+typedef struct {
+    uint24_t id;
+    hook_t *hook;			// pointer to the user hook
+    uint8_t type;			// enum for which OS hook to use
+    uint8_t priority;		// process lowest priorities first
+    bool enabled;
+    char description[1];
+} user_hook_entry_t;
+
+user_hook_entry_t *get_next(user_hook_entry_t *entry);
+
+user_hook_entry_t *get_next(user_hook_entry_t *entry) {
+    return (user_hook_entry_t*)&entry->description[strlen(entry->description) + 1];
+}
+
+void debug_print_db(void) {
+    ti_var_t db = ti_Open(DB_TEMP_NAME, "r");
+    if(!db) {
+        db = ti_Open(DB_NAME, "r");
+    }
+    void *ptr = ti_GetDataPtr(db);
+    database_header_t header;
+    ti_Read(&header, sizeof(header), 1, db);
+
+    user_hook_entry_t *start = ti_GetDataPtr(db);
+    ti_Seek(0, SEEK_END, db);
+    user_hook_entry_t *end = ti_GetDataPtr(db);
+
+    dbg_sprintf(dbgout, "DB: %p | Size: %u | Version: %u\n", ptr, ti_GetSize(db), header.version);
+    for(user_hook_entry_t *current = start; current < end; current = get_next(current)) {
+        dbg_sprintf(dbgout, "id: %06X | hook: %p | type: %2u | priority: %3u | enabled: %c | description: %s\n",
+                    current->id, current->hook, current->type, current->priority, current->enabled ? 'T' : 'F', current->description);
+    }
+    ti_Close(db);
 }

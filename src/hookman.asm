@@ -20,6 +20,9 @@ public	_hook_addresses
 public	_check_hook
 public	_clear_hook
 
+; todo: for test purposes, remove
+public _existing_checked
+
 extern	main_executor
 extern	main_executor_call_location
 extern	main_executor_call_destination
@@ -31,12 +34,6 @@ extern	individual_executor_jump
 extern	individual_executor_size
 
 extern _sort_by_priority
-
-extern _initted
-extern _existing_checked
-extern _database_modified
-
-extern _debug_print_db
 
 include	"hook_equates.inc"
 
@@ -725,6 +722,13 @@ insert_existing:
 
 install_hooks:
 	call	_install_main_executor
+	add	hl,de
+	or	a,a
+	sbc	hl,de
+	jq	nz,.main_executor_installed
+	ld	hl,HOOK_ERROR_NEEDS_GC
+	ret
+.main_executor_installed:
 	call	open_readonly
 	ld	hl,HOOK_ERROR_INTERNAL_DATABASE_IO
 	ret	nc
@@ -838,8 +842,14 @@ install_hooks:
 	push	bc,hl,bc
 	call	_install_individual_executor
 	pop	bc,bc
+	add	hl,de
+	or	a,a
+	sbc	hl,de
 
-	jq	.type_loop
+	jq	nz,.type_loop
+	pop	bc,ix
+	ld	hl,HOOK_ERROR_NEEDS_GC
+	ret
 .num_hooks:
 	rb	1
 
@@ -928,6 +938,10 @@ _install_individual_executor:
 	push	bc
 	call	flash_relocate
 	pop	bc,bc
+	add	hl,de
+	or	a,a
+	sbc	hl,de
+	ret	z
 
 	inc	hl
 
@@ -1037,6 +1051,13 @@ _clear_hook:
 
 main_executor_location:
 	rl	1
+
+_initted:
+	db	0
+_existing_checked:
+	db	0
+_database_modified:
+	db	0
 
 hook_setters:
 	dl	_SetCursorHook
