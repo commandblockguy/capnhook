@@ -719,9 +719,6 @@ insert_existing:
 	ld	a,1
 	ld	(_database_modified),a
 
-	; todo: remove
-	call	_debug_print_db
-
 	jq	.loop
 .entry:
 	db	0,0,0, 0,0,0, 0, $ff, 1, 0

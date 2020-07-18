@@ -19,6 +19,8 @@ void set_key_hook(hook_t *hook);
 bool check_hook(uint24_t type);
 void clear_hook(uint24_t type);
 
+void sort_by_priority(hook_t **hooks, uint8_t *priorities, uint8_t num_hooks);
+
 #define ASSERT(cond) if(!(cond)) {dbg_sprintf((char*)dbgout, "Assertion failed on line %u\n", __LINE__); return false;} else dbg_sprintf((char*)dbgout, "Assertion passed on line %u\n", __LINE__)
 #define ASSERT_EQUAL(var, known) if(var != known) {dbg_sprintf((char*)dbgout, "Assertion failed on line %u, value 0x%X\n", __LINE__, (int)var); return false;} else dbg_sprintf((char*)dbgout, "Assertion passed on line %u\n", __LINE__)
 
@@ -34,6 +36,17 @@ bool check_tests(void) {
     ti_CloseAll();
     ti_Delete("HOOKSDB");
     ti_Delete("HOOKTMP");
+
+    hook_t *test_hooks[5];
+    uint8_t test_priorities[5] = {5, 4, 2, 3, 1};
+    sort_by_priority(test_hooks, test_priorities, 5);
+    for(uint8_t i = 0; i < 5; i++) {
+        dbg_sprintf(dbgout, "%u,", test_priorities[i]);
+    }
+    dbg_sprintf(dbgout, "\n");
+    for(uint8_t i = 0; i < 5; i++) {
+        ASSERT_EQUAL(test_priorities[i], i + 1);
+    }
 
     clear_hook(HOOK_TYPE_RAW_KEY);
 
