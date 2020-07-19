@@ -1,24 +1,7 @@
-# ----------------------------
-# Program Options
-# ----------------------------
+all: lib test
 
-NAME         ?= DEMO
-ICON         ?= icon.png
-DESCRIPTION  ?= "CE C SDK Demo"
-COMPRESSED   ?= NO
-ARCHIVED     ?= NO
+lib:
+	$(MAKE) -C src
 
-# ----------------------------
-# Compile Options
-# ----------------------------
-
-OPT_MODE     ?= -Oz
-EXTRA_CFLAGS ?= -Wall -Wextra
-
-# ----------------------------
-# Debug Options
-# ----------------------------
-
-OUTPUT_MAP   ?= NO
-
-include $(CEDEV)/include/.makefile
+test:
+	$(MAKE) -C test

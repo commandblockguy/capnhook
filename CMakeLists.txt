@@ -8,5 +8,5 @@ include_directories($ENV{CEDEV}/include)
 add_custom_target(Make ALL $(MAKE) WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(hooks
-        src/hookman.h
-        src/test.c)
+        src/capnhook.h
+        test/src/test.c)

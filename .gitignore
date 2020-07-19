@@ -1,5 +1,7 @@
 .idea/
-bin/
-obj/
+test/bin/
+test/obj/
+src/capnhook.8xv
+src/capnhook.lib
 cmake-build-debug/
 

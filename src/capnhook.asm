@@ -1,37 +1,27 @@
-public _hook_Sync
-public _hook_Discard
-public _hook_Install
-public _hook_Uninstall
-public _hook_SetPriority
-public _hook_Enable
-public _hook_Disable
-public _hook_GetHook
-public _hook_GetType
-public _hook_GetPriority
-public _hook_IsInstalled
-public _hook_IsEnabled
-public _hook_GetDescription
-public _hook_CheckValidity
 
-public	_set_hook_by_type
-public	_install_main_executor
-public	_install_individual_executor
-public	_hook_addresses
-public	_check_hook
-public	_clear_hook
+include '../include/library.inc'
+include '../include/include_library.inc'
+;-------------------------------------------------------------------------------
 
-; todo: for test purposes, remove
-public _existing_checked
+library 'CAPNHOOK',1
 
-extern	main_executor
-extern	main_executor_call_location
-extern	main_executor_call_destination
-extern	main_executor_size
-
-extern	individual_executor
-extern	individual_executor_table
-extern	individual_executor_jump
-extern	individual_executor_size
+;-------------------------------------------------------------------------------
+; v1 functions
+;-------------------------------------------------------------------------------
+export hook_Sync
+export hook_Discard
+export hook_Install
+export hook_Uninstall
+export hook_SetPriority
+export hook_Enable
+export hook_Disable
+export hook_GetHook
+export hook_GetType
+export hook_GetPriority
+export hook_IsInstalled
+export hook_IsEnabled
+export hook_GetDescription
+export hook_CheckValidity
 
 include	"hook_equates.inc"
 
@@ -53,6 +43,8 @@ _FindFreeArcSpot	equ	$022078
 OP1			equ	$D005F8
 flags			equ	$D00080
 
+flag_continue	equ	10
+
 AppVarObj		equ	$15
 
 virtual at 0
@@ -67,29 +59,20 @@ virtual at 0
 	HOOK_ERROR_UNKNOWN_DATABASE_VERSION	rb	1
 end virtual
 
-current_version		equ	0
+current_version		equ	1
 
-; todo: remove
-open_dbg:
-	push	hl
-	scf
-	sbc    hl,hl
-	ld     (hl),2
-	pop	hl
-	ret
-
-_hook_Sync:
-	ld	a,(_existing_checked)
+hook_Sync:
+	ld	a,(existing_checked)
 	or	a,a
 	push	ix
-	call	z,_init
+	call	z,init
 	pop	ix
 
-	ld	a,(_initted)
+	ld	a,(initted)
 	or	a,a
 	ret	z
 
-	ld	a,(_database_modified)
+	ld	a,(database_modified)
 	or	a,a
 	jr	z,.not_modified
 
@@ -145,9 +128,9 @@ _hook_Sync:
 	ret	nz
 
 .not_modified:
-	jq	_hook_Discard
+	jq	hook_Discard
 
-_hook_Discard:
+hook_Discard:
 	ld	hl,temp_db_name
 	call	_Mov9ToOP1
 	call	_ChkFindSym
@@ -155,11 +138,11 @@ _hook_Discard:
 	call	_DelVarArc
 .deleted:
 	xor	a,a
-	ld	(_initted),a
-	ld	(_database_modified),a
+	ld	(initted),a
+	ld	(database_modified),a
 	ret
 
-_hook_Install:
+hook_Install:
 	ld	iy,0
 	add	iy,sp
 
@@ -243,14 +226,14 @@ _hook_Install:
 	ldir
 
 	ld	a,1
-	ld	(_database_modified),a
+	ld	(database_modified),a
 	xor	a,a
 	ret
 .pop_exit:
 	pop	bc,ix
 	ret
 
-_hook_Uninstall:
+hook_Uninstall:
 	pop	de,bc
 	push	bc,de,ix
 	call	get_entry_rw
@@ -260,13 +243,13 @@ _hook_Uninstall:
 	call	remove_entry
 
 	ld	a,1
-	ld	(_database_modified),a
+	ld	(database_modified),a
 	xor	a,a
 .exit:
 	pop	ix
 	ret
 
-_hook_SetPriority:
+hook_SetPriority:
 	pop	de,bc,hl
 	push	hl,bc,de,ix,hl
 	call	get_entry_rw
@@ -277,7 +260,7 @@ _hook_SetPriority:
 	; todo: check that this is not an imported OS hook
 
 	ld	a,1
-	ld	(_database_modified),a ; todo: only mark modified if changed
+	ld	(database_modified),a ; todo: only mark modified if changed
 	ld	(ix+7),c
 
 	xor	a,a
@@ -285,7 +268,7 @@ _hook_SetPriority:
 	pop	ix
 	ret
 
-_hook_Enable:
+hook_Enable:
 	pop	de,bc
 	push	bc,de,ix
 	call	get_entry_rw
@@ -295,7 +278,7 @@ _hook_Enable:
 	; todo: check that hook is still valid
 
 	ld	a,1
-	ld	(_database_modified),a ; todo: only mark modified if previously disabled
+	ld	(database_modified),a ; todo: only mark modified if previously disabled
 	ld	(ix+8),a
 
 	xor	a,a
@@ -303,7 +286,7 @@ _hook_Enable:
 	pop	ix
 	ret
 
-_hook_Disable:
+hook_Disable:
 	pop	de,bc
 	push	bc,de,ix
 	call	get_entry_rw
@@ -311,7 +294,7 @@ _hook_Disable:
 	jq	nz,.exit
 
 	ld	a,1
-	ld	(_database_modified),a ; todo: only mark modified if previously enabled
+	ld	(database_modified),a ; todo: only mark modified if previously enabled
 
 	xor	a,a
 	ld	(ix+8),a
@@ -319,7 +302,7 @@ _hook_Disable:
 	pop	ix
 	ret
 
-_hook_GetHook:
+hook_GetHook:
 	pop	de,bc,hl
 	push	hl,bc,de,ix,hl
 	ld	de,0
@@ -337,7 +320,7 @@ _hook_GetHook:
 	pop	ix
 	ret
 
-_hook_GetType:
+hook_GetType:
 	pop	de,bc,hl
 	push	hl,bc,de,ix,hl
 	ld	a,-1
@@ -355,7 +338,7 @@ _hook_GetType:
 	pop	ix
 	ret
 
-_hook_GetPriority:
+hook_GetPriority:
 	pop	de,bc,hl
 	push	hl,bc,de,ix,hl
 
@@ -371,7 +354,7 @@ _hook_GetPriority:
 	pop	ix
 	ret
 
-_hook_IsInstalled:
+hook_IsInstalled:
 	pop	de,bc,hl
 	push	hl,bc,de,ix,hl
 	xor	a,a
@@ -389,7 +372,7 @@ _hook_IsInstalled:
 	pop	ix
 	ret
 
-_hook_IsEnabled:
+hook_IsEnabled:
 	pop	de,bc,hl
 	push	hl,bc,de,ix,hl
 	xor	a,a
@@ -407,7 +390,7 @@ _hook_IsEnabled:
 	pop	ix
 	ret
 
-_hook_GetDescription:
+hook_GetDescription:
 	pop	de,bc,hl
 	push	hl,bc,de,ix,hl
 	ld	de,0
@@ -425,7 +408,7 @@ _hook_GetDescription:
 	pop	ix
 	ret
 
-_hook_CheckValidity:
+hook_CheckValidity:
 	pop	de,bc
 	push	bc,de,ix
 
@@ -443,7 +426,7 @@ _hook_CheckValidity:
 	pop	ix
 	ret
 
-_init:
+init:
 	ld	iy,flags
 	; check if temp DB already exists
 	ld	hl,temp_db_name
@@ -531,14 +514,14 @@ _init:
 	inc	de
 	ldir
 .temp_db_exists:
-	ld	hl,_existing_checked
+	ld	hl,existing_checked
 	bit	0,(hl)
 	jq	nz,.checked_existing
 	set	0,(hl)
 	call	insert_existing
 .checked_existing:
 	ld	a,1
-	ld	(_initted),a
+	ld	(initted),a
 
 	xor	a,a ; return HOOK_SUCCESS
 	ret
@@ -639,11 +622,11 @@ get_entry_readonly:
 ; returns error in a
 get_entry_rw:
 	push	bc
-	ld	a,(_initted)
+	ld	a,(initted)
 	or	a,a
 	jr	nz,.initted
 
-	call	_init
+	call	init
 	or	a,a
 	pop	bc
 	ret	nz
@@ -699,13 +682,13 @@ insert_existing:
 	ret	m
 	push	bc
 
-	call	_check_hook
+	call	check_hook
 	or	a,a
 	jq	z,.loop
 
 	pop	bc ; check if hook is valid
 	push	bc
-	ld	hl,_hook_addresses
+	ld	hl,hook_addresses
 	add	hl,bc
 	add	hl,bc
 	add	hl,bc
@@ -762,14 +745,14 @@ insert_existing:
 	ldir
 
 	ld	a,1
-	ld	(_database_modified),a
+	ld	(database_modified),a
 
 	jq	.loop
 .entry:
 	db	0,0,0, 0,0,0, 0, $ff, 1, 0
 
 install_hooks:
-	call	_install_main_executor
+	call	install_main_executor
 	add	hl,de
 	or	a,a
 	sbc	hl,de
@@ -862,7 +845,7 @@ install_hooks:
 	call	flash_relocate
 	pop	bc,bc,bc
 	push	bc,hl,bc
-	call	_install_individual_executor
+	call	install_individual_executor
 	pop	bc,bc
 	add	hl,de
 	or	a,a
@@ -1012,7 +995,7 @@ flash_relocate:
 	ret
 
 ; todo: check if main executor is already installed?
-_install_main_executor:
+install_main_executor:
 	ld	hl,main_executor_size
 	push	hl
 	call	find_install_location
@@ -1029,7 +1012,7 @@ _install_main_executor:
 	ret
 
 ; void install_individual_executor(hook_type_t type, hook_t *table)
-_install_individual_executor:
+install_individual_executor:
 	push	ix
 	ld	ix,0
 	add	ix,sp
@@ -1096,7 +1079,7 @@ macro iypos flag,bit
 	db	flag,($46) or (bit shl 3)
 end macro
 
-_check_hook:
+check_hook:
 	ld	iy,flags
 	pop	bc,de
 	push	de,bc
@@ -1142,29 +1125,83 @@ _check_hook:
 	iypos	 hookflags4,7	; SILENT_LINK
 	iypos	 hookflags5,0	; USB_ACTIVITY
 
-_clear_hook:
-	pop	bc,de
-	push	de,bc
-
-	ld	iy,flags
-
-	ld	hl,hook_clearers
+main_executor:
+	push	af,bc,de,hl,iy
+.loop:
+	ld	hl,(ix)	; check if we've reached the null terminator
 	add	hl,de
-	add	hl,de
-	add	hl,de
+	or	a,a
+	sbc	hl,de
+	jr	z,.exit
 
-	ld	hl,(hl)
+	ld	a,$83	; check if this is a valid hook
+	cp	a,(hl)
+	inc	hl
+	jr	nz,.next
 
-	jp	(hl)
+	xor	a,a	; reset our custom continue flag
+	ld	(flags - flag_continue),a
+
+	push	ix	; pointer to current table entry
+	call	.execute
+main_executor_call_location = $-3	; since we don't know where exactly this is running at assembly-time, we'll have to edit this while installing
+
+	push	af,hl	; check if the return flag is set
+	ld	hl,flags - flag_continue
+	bit	0,(hl)
+	jr	z,.return_value
+	pop	hl,af,ix
+
+.next:
+	inc	ix	; next entry please
+	inc	ix
+	inc	ix
+	jr	.loop
+
+.return_value:
+	pop	hl,af
+	ld	(scrapMem),hl
+	ld	hl,7*3	; we don't care about anything else on the stack anymore
+	add	hl,sp
+	ld	sp,hl
+	ld	hl,(scrapMem)
+	ret
+.exit:
+	pop	iy,hl,de,bc,af,ix
+	ret
+
+.execute:
+main_executor_call_destination = $
+	ld	ix,0
+	add	ix,sp
+	ld	de,(ix+9) ; original value of hl
+	push	de
+	ld	a,(ix+19) ; restore original registers
+	ld	bc,(ix+15)
+	ld	de,(ix+12)
+	ld	iy,(ix+6)
+	ld	ix,(ix+21)
+	ex	(sp),hl
+	ret
+main_executor_size = $-main_executor
+
+individual_executor:
+	db	'm', $83
+	push	ix
+	ld	ix,0
+individual_executor_table = $-3
+	jp	0
+individual_executor_jump = $-3
+individual_executor_size = $ - individual_executor
 
 main_executor_location:
 	rl	1
 
-_initted:
+initted:
 	db	0
-_existing_checked:
+existing_checked:
 	db	0
-_database_modified:
+database_modified:
 	db	0
 
 hook_setters:
@@ -1191,31 +1228,7 @@ hook_setters:
 	dl	_SetLocalizeHook
 	dl	_SetSilentLinkHook
 	dl	_SetUSBActivityHook
-hook_clearers:
-	dl	_ClrCursorHook
-	dl	_ClrLibraryHook
-	dl	_ClrRawKeyHook
-	dl	_ClrGetKeyHook
-	dl	_ClrHomescreenHook
-	dl	_ClrWindowHook
-	dl	_ClrGraphModeHook
-	dl	_ClrYeditHook
-	dl	_ClrFontHook
-	dl	_ClrRegraphHook
-	dl	_ClrGraphicsHook
-	dl	_ClrTraceHook
-	dl	_ClrParserHook
-	dl	_ClrAppChangeHook
-	dl	_ClrCatalog1Hook
-	dl	_ClrHelpHook
-	dl	_ClrCxReDispHook
-	dl	_ClrMenuHook
-	dl	_ClrCatalog2Hook
-	dl	_ClrTokenHook
-	dl	_ClrLocalizeHook
-	dl	_ClrSilentLinkHook
-	dl	_ClrUSBActivityHook
-_hook_addresses:
+hook_addresses:
 	dl	cursorHookPtr
 	dl	libraryHookPtr
 	dl	rawKeyHookPtr
