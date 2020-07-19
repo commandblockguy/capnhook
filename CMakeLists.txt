@@ -9,4 +9,4 @@ add_custom_target(Make ALL $(MAKE) WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 
 add_executable(hooks
         src/hookman.h
-        src/hookman.c src/test.c)
+        src/test.c)

@@ -33,8 +33,6 @@ extern	individual_executor_table
 extern	individual_executor_jump
 extern	individual_executor_size
 
-extern _sort_by_priority
-
 include	"hook_equates.inc"
 
 _strcpy			equ	$0000CC
@@ -777,18 +775,16 @@ install_hooks:
 
 	ld	hl,.num_hooks
 	ld	c,(hl)
-	ld	hl,hooks
+	ld	hl,hooks_buf
 	add	hl,bc
 	add	hl,bc
 	add	hl,bc
-	push	bc
-	ld	bc,(ix+3) ; hook ptr
-	ld	(hl),bc
-	pop	bc
-	ld	hl,priorities
 	add	hl,bc
 	ld	a,(ix+7)
 	ld	(hl),a
+	inc	hl
+	ld	bc,(ix+3) ; hook ptr
+	ld	(hl),bc
 
 	ld	a,(.num_hooks)
 	inc	a
@@ -804,38 +800,14 @@ install_hooks:
 	or	a,a
 	jq	z,.type_loop
 
-	ld	bc,0
-	ld	c,a
-	push	bc ; num_hooks
-	ld	bc,priorities
-	push	bc
-	ld	bc,hooks
-	push	bc
-	call	_sort_by_priority
-	pop	bc
-	pop	bc
-	pop	bc
+	ld	b,a
+	call	sort_by_priority
 
-	ld	hl,.num_hooks
-	ld	bc,0
-	ld	c,(hl)
-	push	bc
-	pop	hl
-	add	hl,bc
-	add	hl,bc
-	push	hl ; 3 * (.num_hooks)
-	ld	bc,hooks
-	add	hl,bc
-	ld	bc,0 ; add null terminator
-	ld	(hl),bc
-
-	pop	hl
-	inc	hl
-	inc	hl
-	inc	hl
+	or	a,a
+	ld	de,hooks_buf
+	sbc	hl,de
 	push	hl
-	ld	hl,hooks
-	push	hl
+	push	de
 
 	call	flash_relocate
 	pop	bc,bc,bc
@@ -853,10 +825,96 @@ install_hooks:
 .num_hooks:
 	rb	1
 
-priorities:
-	rb	256
-hooks:
-	rb	256 * 3
+hooks_buf:
+	rb	256 * 4
+
+; input: b = num hooks
+; hl = i/j
+; b = num hooks
+; c = priority
+; de = scrap
+sort_by_priority:
+	ld	hl,hooks_buf
+	push	bc,hl
+.loop:
+	pop	hl
+	inc	hl
+	inc	hl
+	inc	hl
+	inc	hl
+	dec	b
+	jq	z,.exit
+	ld	c,(hl)
+	inc	hl
+	ld	de,(hl)
+	dec	hl
+	push	hl,de
+.inner_loop:
+	or	a,a
+	dec	hl
+	dec	hl
+	dec	hl
+	dec	hl
+
+	ld	de,hooks_buf
+	sbc	hl,de
+	add	hl,de
+	jq	c,.inner_exit
+
+	ld	a,(hl)
+	cp	a,c
+	jq	c,.inner_exit
+
+	inc	hl
+	ld	de,(hl)
+	inc	hl
+	inc	hl
+	inc	hl
+	ld	(hl),a
+	inc	hl
+	ld	(hl),de
+	dec	hl
+	dec	hl
+	dec	hl
+	dec	hl
+	dec	hl
+	jq	.inner_loop
+.inner_exit:
+	pop	de
+	inc	hl
+	inc	hl
+	inc	hl
+	inc	hl
+	ld	(hl),c
+	inc	hl
+	ld	(hl),de
+
+	jq	.loop
+.exit:
+	pop	bc
+	ld	hl,0
+	ld	de,0
+	ld	e,b
+	add	hl,de
+	add	hl,de
+	add	hl,de
+	push	hl
+	pop	bc
+	ld	hl,hooks_buf+1
+	ld	de,hooks_buf
+.remove_priorities_loop:
+	ldi
+	ldi
+	ldi
+	inc	hl
+	jq	pe,.remove_priorities_loop
+	ex	hl,de
+	ld	de,0
+	ld	(hl),de
+	inc	hl
+	inc	hl
+	inc	hl
+	ret
 
 ; todo: should I use actual relocation for this?
 ; also, should I expose this function to the user?
