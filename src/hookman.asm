@@ -196,8 +196,11 @@ _hook_Install:
 	ld	bc,(iy+3) ; id
 	call	get_entry_rw
 	pop	de,iy
+	cp	a,HOOK_ERROR_NO_MATCHING_ID+1
+	jq	nc,.pop_exit ; return error if not success or no id
 	push	iy,de,hl
-	jr	nc,.removed
+	cp	a,HOOK_ERROR_NO_MATCHING_ID
+	jq	z,.removed
 	ld	a,(ix+7) ; set new priority to old priority
 	ld	(iy+12),a
 	call	remove_entry
@@ -251,8 +254,8 @@ _hook_Uninstall:
 	pop	de,bc
 	push	bc,de,ix
 	call	get_entry_rw
-	ld	a,HOOK_ERROR_NO_MATCHING_ID
-	jq	nc,.exit
+	or	a,a
+	jq	nz,.exit
 
 	call	remove_entry
 
@@ -268,8 +271,8 @@ _hook_SetPriority:
 	push	hl,bc,de,ix,hl
 	call	get_entry_rw
 	pop	bc
-	ld	a,HOOK_ERROR_NO_MATCHING_ID
-	jq	nc,.exit
+	or	a,a
+	jq	nz,.exit
 
 	; todo: check that this is not an imported OS hook
 
@@ -286,8 +289,8 @@ _hook_Enable:
 	pop	de,bc
 	push	bc,de,ix
 	call	get_entry_rw
-	ld	a,HOOK_ERROR_NO_MATCHING_ID
-	jq	nc,.exit
+	or	a,a
+	jq	nz,.exit
 
 	; todo: check that hook is still valid
 
@@ -304,8 +307,8 @@ _hook_Disable:
 	pop	de,bc
 	push	bc,de,ix
 	call	get_entry_rw
-	ld	a,HOOK_ERROR_NO_MATCHING_ID
-	jq	nc,.exit
+	or	a,a
+	jq	nz,.exit
 
 	ld	a,1
 	ld	(_database_modified),a ; todo: only mark modified if previously enabled
@@ -441,6 +444,7 @@ _hook_CheckValidity:
 	ret
 
 _init:
+	ld	iy,flags
 	; check if temp DB already exists
 	ld	hl,temp_db_name
 	call	_Mov9ToOP1
@@ -448,7 +452,9 @@ _init:
 	jq	c,.create_temp_db
 	call	_ChkInRam
 	jq	z,.temp_db_exists
-	; todo: unarchive temp db
+	ld	hl,temp_db_name
+	call	_Mov9ToOP1
+	call	_Arc_Unarc
 	jq	.temp_db_exists
 .create_temp_db:
 	; check if real DB exists
@@ -457,10 +463,11 @@ _init:
 	call	_ChkFindSym
 	jq	nc,.real_db_exists
 
+.real_db_not_exists:
 	; real DB does not exist - create empty temp DB
 	ld	hl,3 ; return if no space
 	call	_EnoughMem
-	ld	a,HOOK_ERROR_INTERNAL_DATABASE_IO ; todo: add new "no memory" error?
+	ld	a,HOOK_ERROR_INTERNAL_DATABASE_IO
 	ret	c
 
 	ld	hl,temp_db_name
@@ -475,12 +482,35 @@ _init:
 	ld	(hl),de
 	jq	.temp_db_exists
 .real_db_exists:
-	; todo: check version, archive if not already
+	call	_ChkInRam
+	jq	nz,.real_db_archived
+
+	; todo: check if GC required?
+	ld	hl,db_name ; archive DB if not already
+	call	_Mov9ToOP1
+	call	_PushOP1
+	call	_Arc_Unarc
+	call	_PopOP1
+	call	_ChkFindSym
+	jq	c,.real_db_not_exists
+.real_db_archived:
 	; get size of DB
 	ex	hl,de
 	call	skip_archive_header
 	push	hl
 	ld	de,(hl)
+	inc	hl
+	inc	hl
+	ld	bc,(hl)
+	ld	hl,current_version
+	or	a,a
+	sbc	hl,bc
+	jq	z,.version_correct
+
+	ld	a,HOOK_ERROR_UNKNOWN_DATABASE_VERSION
+	pop	hl
+	ret
+.version_correct:
 	ex	hl,de
 	; check if there is enough memory
 	call	_EnoughMem
@@ -583,7 +613,14 @@ open_readonly:
 	call	nz,skip_archive_header
 	push	hl
 	pop	ix
+	; todo: return the error type to the user somehow
+	ld	de,(ix+2) ; check database version
+	ld	hl,current_version
+	or	a,a
+	sbc	hl,de
 	scf
+	ret	z
+	ccf
 	ret
 
 ; bc: id
@@ -599,18 +636,25 @@ get_entry_readonly:
 ; bc: id
 ; returns entry in ix
 ; returns pointer to var size in hl
-; carry flag set if found
+; returns error in a
 get_entry_rw:
 	push	bc
 	ld	a,(_initted)
 	or	a,a
-	call	z,_init
+	jr	nz,.initted
 
+	call	_init
+	or	a,a
+	pop	bc
+	ret	nz
+	push	bc
+.initted:
 	ld	hl,temp_db_name
 	call	_Mov9ToOP1
 	call	_ChkFindSym
 	pop	bc
 	ccf
+	ld	a,HOOK_ERROR_INTERNAL_DATABASE_IO
 	ret	nc
 
 	ex	hl,de
@@ -618,6 +662,9 @@ get_entry_rw:
 	pop	ix
 	call	get_entry
 	pop	hl
+	ld	a,HOOK_ERROR_NO_MATCHING_ID
+	ret	nc
+	ld	a,0
 	ret
 
 ; ix: entry
@@ -686,8 +733,11 @@ insert_existing:
 	jq	c,.loop
 
 	call	get_entry_rw
+	cp	a,HOOK_ERROR_NO_MATCHING_ID+1
+	jq	nc,.loop ; don't do anything if error besides "no matching id"
 	push	hl
-	call	c,remove_entry
+	cp	a,HOOK_ERROR_NO_MATCHING_ID
+	call	z,remove_entry
 	pop	ix
 
 	push	ix
@@ -724,11 +774,11 @@ install_hooks:
 	or	a,a
 	sbc	hl,de
 	jq	nz,.main_executor_installed
-	ld	hl,HOOK_ERROR_NEEDS_GC
+	ld	a,HOOK_ERROR_NEEDS_GC
 	ret
 .main_executor_installed:
 	call	open_readonly
-	ld	hl,HOOK_ERROR_INTERNAL_DATABASE_IO
+	ld	a,HOOK_ERROR_INTERNAL_DATABASE_IO
 	ret	nc
 	push	ix
 	ld	bc,23 ; num types
@@ -737,7 +787,7 @@ install_hooks:
 	pop	bc
 	dec	c
 	pop	ix
-	ld	hl,HOOK_SUCCESS
+	ld	a,HOOK_SUCCESS
 	ret	m
 	push	ix,bc
 
@@ -820,7 +870,7 @@ install_hooks:
 
 	jq	nz,.type_loop
 	pop	bc,ix
-	ld	hl,HOOK_ERROR_NEEDS_GC
+	ld	a,HOOK_ERROR_NEEDS_GC
 	ret
 .num_hooks:
 	rb	1
