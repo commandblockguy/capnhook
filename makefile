@@ -1,7 +1,7 @@
-all: lib test
+all: lib test_program
 
 lib:
 	$(MAKE) -C src
 
-test:
+test_program:
 	$(MAKE) -C test
