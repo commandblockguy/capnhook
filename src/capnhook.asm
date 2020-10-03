@@ -1,6 +1,5 @@
 
 include '../include/library.inc'
-include '../include/include_library.inc'
 ;-------------------------------------------------------------------------------
 
 library 'CAPNHOOK',1
