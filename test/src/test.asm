@@ -85,9 +85,13 @@ _trigger_key_hook:
 	cp	a,(hl)
 	jr	nz,.invalid
 
+	push	ix
+
 	inc	hl
 	ld	a,e
-	jp	(hl)
+	call	jp_hl
+	pop	ix
+	ret
 
 .invalid:
 	ld	a,-1
@@ -105,7 +109,7 @@ _clear_hook:
 	add	hl,de
 
 	ld	hl,(hl)
-
+jp_hl:
 	jp	(hl)
 
 macro iypos flag,bit

@@ -1173,15 +1173,14 @@ main_executor_call_location = $-3	; since we don't know where exactly this is ru
 main_executor_call_destination = $
 	ld	ix,0
 	add	ix,sp
-	ld	de,(ix+9) ; original value of hl
-	push	de
+	push	hl
 	ld	a,(ix+19) ; restore original registers
 	ld	bc,(ix+15)
 	ld	de,(ix+12)
+	ld	hl,(ix+9)
 	ld	iy,(ix+6)
-	ld	ix,(ix+21)
-	ex	(sp),hl
-	ret
+	pop	ix ; ix register is set to the address of the hook being called
+	jp	(ix)
 main_executor_size = $-main_executor
 
 individual_executor:
