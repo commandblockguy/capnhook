@@ -1,5 +1,6 @@
-#include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 enum {
     HOOK_TYPE_CURSOR = 0,

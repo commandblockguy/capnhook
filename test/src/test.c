@@ -5,7 +5,7 @@
 #undef NDEBUG
 #include <debug.h>
 #include <fileioc.h>
-#include "../../src/capnhook.h"
+#include <capnhook.h>
 
 // These aren't relocated, since we don't need to test them after the program exits
 extern hook_t hook_1, hook_2, hook_3, hook_os;
