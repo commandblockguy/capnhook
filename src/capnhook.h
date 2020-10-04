@@ -170,6 +170,14 @@ hook_error_t hook_GetPriority(uint24_t id, uint8_t *result);
 hook_error_t hook_IsEnabled(uint24_t id, bool *result);
 
 /**
+ * Get the size of a hook
+ * @param id The hook ID
+ * @param result Set to the hook's size, or 0 if the hook is used in-place
+ * @return An error code or HOOK_SUCCESS
+ */
+hook_error_t hook_GetSize(uint24_t id, size_t *result);
+
+/**
  * Get the description of a hook
  * @param id The hook ID
  * @param result Set to a pointer to the hook description

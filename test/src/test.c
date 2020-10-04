@@ -30,6 +30,7 @@ void debug_print_db(void);
 bool check_tests(void) {
     uint8_t priority;
     uint8_t type;
+    size_t size;
     char *description;
     hook_t *hook;
     hook_error_t err;
@@ -94,9 +95,12 @@ bool check_tests(void) {
     err = hook_GetType(0xFF0001, &type);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(type, HOOK_TYPE_RAW_KEY);
+    err = hook_GetSize(0xFF0001, &size);
+    ASSERT_EQUAL(err, HOOK_SUCCESS);
+    ASSERT_EQUAL(size, hook_1_size);
     err = hook_GetHook(0xFF0001, &hook);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
-    ASSERT_EQUAL(memcmp(hook, &hook_1, hook_1_size), 0);
+    ASSERT_EQUAL(memcmp(hook, &hook_1, size), 0);
     err = hook_GetDescription(0xFF0001, &description);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT(strcmp(description, "Test Hook 1") == 0);
