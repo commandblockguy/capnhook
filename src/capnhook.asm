@@ -1063,8 +1063,24 @@ install_individual_executor:
 	ld	bc,(main_executor_location)
 	ld	(individual_executor_jump),bc
 
-	ld	bc,individual_executor_size
+	ld	hl,hook_exec_tails
+	ld	bc,(ix+6)
+	add	hl,bc
+	add	hl,bc
+	add	hl,bc
+	ld	hl,(hl)
+	ld	bc,(hl) ; size of tail
+	inc	hl
+	inc	hl
+	inc	hl ; beginning of tail
+	ld	de,individual_executor.tail
 	push	bc
+	ldir
+	pop	hl
+
+	ld	bc,individual_executor_size
+	add	hl,bc
+	push	hl
 	ld	bc,individual_executor
 	push	bc
 	call	flash_relocate
@@ -1201,13 +1217,13 @@ main_executor_call_location = $-3	; since we don't know where exactly this is ru
 .return_value:
 	pop	hl,af
 	ld	(scrapMem),hl
-	ld	hl,7*3	; we don't care about anything else on the stack anymore
+	ld	hl,8*3	; we don't care about anything else on the stack anymore
 	add	hl,sp
 	ld	sp,hl
 	ld	hl,(scrapMem)
 	ret
 .exit:
-	pop	iy,hl,de,bc,af,ix
+	pop	iy,hl,de,bc,af
 	ret
 
 .execute:
@@ -1229,9 +1245,77 @@ individual_executor:
 	push	ix
 	ld	ix,0
 individual_executor_table = $-3
-	jp	0
+	call	0
 individual_executor_jump = $-3
+	pop	ix
 individual_executor_size = $ - individual_executor
+.tail:
+	rb	getkey_tail_size ; todo: get maximum tail size
+
+libraryHookTail:
+appChangeHookTail:
+helpHookTail:
+tokenHookTail:
+USBActivityHookTail:
+	dl	ret_tail_size
+ret_tail:
+	ret
+ret_tail_size = $ - ret_tail
+
+homescreenHookTail:
+windowHookTail:
+graphHookTail:
+yEqualsHookTail:
+regraphHookTail:
+graphicsHookTail:
+traceHookTail:
+parserHookTail:
+catalog1HookTail:
+cxRedispHookTail:
+menuHookTail:
+catalog2HookTail:
+	dl	ret_z_tail_size
+ret_z_tail:
+	cp	a,a
+	ret
+ret_z_tail_size = $ - ret_z_tail
+
+rawKeyHookTail:
+fontHookTail:
+silentLinkHookTail:
+	dl	ret_nz_tail_size
+ret_nz_tail:
+	or	a,a ; todo: actually reset z even if a is 0
+	ret
+ret_nz_tail_size = $ - ret_nz_tail
+
+getKeyHookTail:
+	dl	getkey_tail_size
+getkey_tail:
+	cp	a,$1b
+	ret	nz
+	or	a,a
+	ld	a,b
+	ret
+getkey_tail_size = $ - getkey_tail
+
+cursorHookTail:
+	dl	cursor_tail_size
+cursor_tail:
+	cp	a,$24
+	ret	nz
+	ld	a,b
+	or	a,a
+	ret
+cursor_tail_size = $ - cursor_tail
+
+localizeHookTail:
+	dl	localize_tail_size
+localize_tail:
+	or	a,a ; todo: actually implement
+	ret
+localize_tail_size = $ - localize_tail
+
 
 main_executor_location:
 	rl	1
@@ -1291,6 +1375,30 @@ hook_addresses:
 	dl	localizeHookPtr
 	dl	silentLinkHookPtr
 	dl	USBActivityHookPtr
+hook_exec_tails: ; Hooks to be called if no user hooks want to return
+	dl	cursorHookTail
+	dl	libraryHookTail
+	dl	rawKeyHookTail
+	dl	getKeyHookTail
+	dl	homescreenHookTail
+	dl	windowHookTail
+	dl	graphHookTail
+	dl	yEqualsHookTail
+	dl	fontHookTail
+	dl	regraphHookTail
+	dl	graphicsHookTail
+	dl	traceHookTail
+	dl	parserHookTail
+	dl	appChangeHookTail
+	dl	catalog1HookTail
+	dl	helpHookTail
+	dl	cxRedispHookTail
+	dl	menuHookTail
+	dl	catalog2HookTail
+	dl	tokenHookTail
+	dl	localizeHookTail
+	dl	silentLinkHookTail
+	dl	USBActivityHookTail
 
 temp_db_name:
 	db	AppVarObj,"HOOKTMP",0
