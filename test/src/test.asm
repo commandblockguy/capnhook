@@ -15,6 +15,8 @@ public _trigger_key_hook
 public _clear_key_hook
 public _set_key_hook
 
+public _hook_1_size
+
 include '../../src/hook_equates.inc'
 
 flags		equ	$D00080
@@ -30,6 +32,8 @@ _hook_1: ; causes all A keypresses to become B
 	inc	a
 	res	0,(iy - flag_continue)
 	ret
+_hook_1_size:
+	dl	$-_hook_1
 
 _hook_2: ; causes all C keypresses to become D
 	db	$83

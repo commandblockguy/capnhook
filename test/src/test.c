@@ -10,6 +10,8 @@
 // These aren't relocated, since we don't need to test them after the program exits
 extern hook_t hook_1, hook_2, hook_3, hook_os;
 
+extern size_t hook_1_size;
+
 extern bool hook_1_run, hook_2_run, hook_3_run, hook_os_run;
 
 uint8_t trigger_key_hook(uint8_t a);
@@ -48,7 +50,8 @@ bool check_tests(void) {
     ASSERT_EQUAL(installed, false);
 
     // Install test hooks
-    err = hook_Install(0xFF0001, &hook_1, 0, HOOK_TYPE_RAW_KEY, 10, "Test Hook 1");
+    ASSERT(hook_1_size > 0);
+    err = hook_Install(0xFF0001, &hook_1, hook_1_size, HOOK_TYPE_RAW_KEY, 10, "Test Hook 1");
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     debug_print_db();
 
@@ -93,7 +96,7 @@ bool check_tests(void) {
     ASSERT_EQUAL(type, HOOK_TYPE_RAW_KEY);
     err = hook_GetHook(0xFF0001, &hook);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
-    ASSERT_EQUAL(hook, &hook_1);
+    ASSERT_EQUAL(memcmp(hook, &hook_1, hook_1_size), 0);
     err = hook_GetDescription(0xFF0001, &description);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT(strcmp(description, "Test Hook 1") == 0);

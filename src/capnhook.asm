@@ -141,7 +141,6 @@ hook_Discard:
 	ld	(database_modified),a
 	ret
 
-; todo: copy hook if size is nonzero
 hook_Install:
 	ld	iy,0
 	add	iy,sp
@@ -174,6 +173,29 @@ hook_Install:
 	call	_EnoughMem
 	ld	a,HOOK_ERROR_INTERNAL_DATABASE_IO
 	jq	c,.pop_exit
+
+	ld	hl,(iy+9) ; check if size is 0
+	add	hl,de
+	or	a,a
+	sbc	hl,de
+	jq	z,.copied
+
+	push	iy,de
+	push	hl
+	ld	bc,(iy+6)
+	push	bc
+	ld	iy,flags
+	call	flash_relocate
+	pop	bc,bc,de,iy
+
+	add	hl,de ; check if null
+	or	a,a
+	sbc	hl,de
+	ld	a,HOOK_ERROR_NEEDS_GC
+	jq	z,.pop_exit
+
+	ld	(iy+6),hl
+.copied:
 
 	push	iy,de ; delete existing
 	ld	bc,(iy+3) ; id
@@ -952,7 +974,6 @@ sort_by_priority:
 	ret
 
 ; todo: should I use actual relocation for this?
-; also, should I expose this function to the user?
 flash_relocate:
 	pop	de,bc,hl ; hl = size
 	push	hl,bc,de,bc
