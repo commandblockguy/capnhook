@@ -58,7 +58,7 @@ virtual at 0
 	HOOK_ERROR_UNKNOWN_DATABASE_VERSION	rb	1
 end virtual
 
-current_version		equ	1
+current_version		equ	2
 
 hook_Sync:
 	ld	a,(existing_checked)
@@ -141,11 +141,12 @@ hook_Discard:
 	ld	(database_modified),a
 	ret
 
+; todo: copy hook if size is nonzero
 hook_Install:
 	ld	iy,0
 	add	iy,sp
 
-	ld	a,(iy+9) ; check that the type is valid
+	ld	a,(iy+12) ; check that the type is valid
 	cp	a,23
 	ld	a,HOOK_ERROR_UNKNOWN_TYPE
 	ret	nc
@@ -156,7 +157,7 @@ hook_Install:
 	ld	a,HOOK_ERROR_INVALID_USER_HOOK
 	ret	nz
 
-	ld	hl,(iy+15)
+	ld	hl,(iy+18)
 	xor	a,a
 	ld	bc,0
 	cpir
@@ -168,7 +169,7 @@ hook_Install:
 	ret	nz
 	push	ix,hl
 
-	ld	bc,9 ; size of entry not including description
+	ld	bc,12 ; size of entry not including description
 	add	hl,bc
 	call	_EnoughMem
 	ld	a,HOOK_ERROR_INTERNAL_DATABASE_IO
@@ -184,7 +185,7 @@ hook_Install:
 	cp	a,HOOK_ERROR_NO_MATCHING_ID
 	jq	z,.removed
 	ld	a,(ix+7) ; set new priority to old priority
-	ld	(iy+12),a
+	ld	(iy+15),a
 	call	remove_entry
 .removed:
 	pop	hl,de
@@ -211,17 +212,19 @@ hook_Install:
 	ld	(ix),bc
 	ld	bc,(iy+6) ; hook
 	ld	(ix+3),bc
-	ld	a,(iy+9) ; type
+	ld	bc,(iy+9) ; size
+	ld	(ix+9),bc
+	ld	a,(iy+12) ; type
 	ld	(ix+6),a
-	ld	a,(iy+12) ; priority
+	ld	a,(iy+15) ; priority
 	ld	(ix+7),a
 	ld	a,1 ; enabled
 	ld	(ix+8),a
 
-	lea	ix,ix+9
+	lea	ix,ix+12
 	push	ix
 	pop	de,bc,ix
-	ld	hl,(iy+15)
+	ld	hl,(iy+18)
 	ldir
 
 	ld	a,1
@@ -400,7 +403,7 @@ hook_GetDescription:
 	ld	a,HOOK_ERROR_NO_MATCHING_ID
 	jq	nc,.pop_ix_ret
 
-	lea	ix,ix+9
+	lea	ix,ix+12
 	ld	(hl),ix
 	xor	a,a
 .pop_ix_ret:
@@ -539,7 +542,7 @@ skip_archive_header:
 
 ; ix: pointer to entry
 get_next:
-	lea	ix,ix+9 ; start of description
+	lea	ix,ix+12 ; start of description
 .loop:
 	ld	a,(ix)
 	or	a,a
@@ -664,7 +667,7 @@ remove_entry:
 	pop	de
 	pop	ix ; hl: pointer to size
 	ld	hl,0
-	ld	l,(ix)
+	ld	l,(ix) ; todo: figure out what this is doing
 	ld	h,(ix+1)
 	or	a,a
 	sbc	hl,de
@@ -1180,7 +1183,7 @@ main_executor_call_destination = $
 	ld	hl,(ix+9)
 	ld	iy,(ix+6)
 	pop	ix ; ix register is set to the address of the hook being called
-	jp	(ix)
+	jp	(ix) ; todo: for some hook types, ix is not the address of the function 
 main_executor_size = $-main_executor
 
 individual_executor:

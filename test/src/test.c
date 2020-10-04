@@ -23,6 +23,8 @@ void debug_print_db(void);
 #define ASSERT(cond) if(!(cond)) {dbg_sprintf((char*)dbgout, "Assertion failed on line %u\n", __LINE__); return false;} else dbg_sprintf((char*)dbgout, "Assertion passed on line %u\n", __LINE__)
 #define ASSERT_EQUAL(var, known) if(var != known) {dbg_sprintf((char*)dbgout, "Assertion failed on line %u, value 0x%X\n", __LINE__, (int)var); return false;} else dbg_sprintf((char*)dbgout, "Assertion passed on line %u\n", __LINE__)
 
+// todo: test installing hooks with an actual size
+
 bool check_tests(void) {
     uint8_t priority;
     uint8_t type;
@@ -46,7 +48,7 @@ bool check_tests(void) {
     ASSERT_EQUAL(installed, false);
 
     // Install test hooks
-    err = hook_Install(0xFF0001, &hook_1, HOOK_TYPE_RAW_KEY, 10, "Test Hook 1");
+    err = hook_Install(0xFF0001, &hook_1, 0, HOOK_TYPE_RAW_KEY, 10, "Test Hook 1");
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     debug_print_db();
 
@@ -66,7 +68,7 @@ bool check_tests(void) {
     ASSERT_EQUAL(ti_Open("HOOKTMP", "r"), 0);
     ASSERT_EQUAL(check_hook(HOOK_TYPE_RAW_KEY), true);
 
-    err = hook_Install(0xFF0002, &hook_2, HOOK_TYPE_RAW_KEY, 20, "Test Hook 2");
+    err = hook_Install(0xFF0002, &hook_2, 0, HOOK_TYPE_RAW_KEY, 20, "Test Hook 2");
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     debug_print_db();
 
@@ -74,7 +76,7 @@ bool check_tests(void) {
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     ASSERT_EQUAL(installed, true);
 
-    err = hook_Install(0xFF0003, &hook_3, HOOK_TYPE_RAW_KEY, 25, "Test Hook 2");
+    err = hook_Install(0xFF0003, &hook_3, 0, HOOK_TYPE_RAW_KEY, 25, "Test Hook 3");
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     debug_print_db();
 
@@ -108,7 +110,7 @@ bool check_tests(void) {
     ASSERT_EQUAL(priority, 15);
 
     // Test reinstalling with the same ID
-    err = hook_Install(0xFF0001, &hook_1, HOOK_TYPE_RAW_KEY, 10, "Test Hook 1 - Alt");
+    err = hook_Install(0xFF0001, &hook_1, 0, HOOK_TYPE_RAW_KEY, 10, "Test Hook 1 - Alt");
     ASSERT_EQUAL(err, HOOK_SUCCESS);
     debug_print_db();
 
@@ -267,6 +269,7 @@ typedef struct {
     uint8_t type;			// enum for which OS hook to use
     uint8_t priority;		// process lowest priorities first
     bool enabled;
+    uint24_t size;
     char description[1];
 } user_hook_entry_t;
 
@@ -291,8 +294,8 @@ void debug_print_db(void) {
 
     dbg_sprintf(dbgout, "DB: %p | Size: %u | Version: %u\n", ptr, ti_GetSize(db), header.version);
     for(user_hook_entry_t *current = start; current < end; current = get_next(current)) {
-        dbg_sprintf(dbgout, "id: %06X | hook: %p | type: %2u | priority: %3u | enabled: %c | description: %s\n",
-                    current->id, current->hook, current->type, current->priority, current->enabled ? 'T' : 'F', current->description);
+        dbg_sprintf(dbgout, "id: %06X | hook: %p | type: %2u | priority: %3u | enabled: %c | size: %u | description: %s\n",
+                    current->id, current->hook, current->type, current->priority, current->enabled ? 'T' : 'F', current->size, current->description);
     }
     ti_Close(db);
 }

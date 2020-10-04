@@ -68,7 +68,16 @@ hook_error_t hook_Sync(void);
 hook_error_t hook_Discard(void);
 
 /**
- * Installs a hook
+ * Installs a hook.
+ *
+ * If @param size is nonzero, a copy of @param hook will be created which
+ * persists across RAM resets and garbage collects.
+ * As a result, @param hook must be position-independent.
+ *
+ * If @param size is zero, @param hook will not be copied but used in-place.
+ * This is not recommended except for apps, as hooks stored in RAM will
+ * become invalid after the program exits and hooks stored in the archive
+ * will become invalid after a garbage collect.
  *
  * If another hook with the same ID is already installed, the old hook will be
  * replaced with the new one. The old hook's priority will be preserved.
@@ -76,17 +85,19 @@ hook_error_t hook_Discard(void);
  * @param id A unique id for the hook. This must be unique among all programs
  * that use this library. You should register your ID on this page:
  * https://github.com/commandblockguy/capnhook/wiki/Hook-ID-Registry
- * @param hook A pointer to the hook to install. The hook should already be in
- * a persistent location such as the archive, as this function does not
- * relocate the hooks.
+ * @param hook A pointer to the hook to install. If @param size is nonzero,
+ * must be position-independent.
+ * @param size The size of the hook. If zero, the hook will be used in-place
+ * rather than being copied.
  * @param type The hook type determines what type of OS event the hook will
  * trigger on.
  * @param priority Hooks with lower priority values are called prior to hooks
  * with higher priority values.
- * @param description A human-readable description of the hook, up to 255 chars.
+ * @param description A human-readable description of the hook, up to 255
+ * chars in length.
  * @return An error code or HOOK_SUCCESS
  */
-hook_error_t hook_Install(uint24_t id, hook_t *hook, hook_type_t type, uint8_t priority, const char *description);
+hook_error_t hook_Install(uint24_t id, hook_t *hook, size_t size, hook_type_t type, uint8_t priority, const char *description);
 
 /**
  * Uninstall a hook
