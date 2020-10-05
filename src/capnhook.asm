@@ -1250,7 +1250,7 @@ individual_executor_jump = $-3
 	pop	ix
 individual_executor_size = $ - individual_executor
 .tail:
-	rb	getkey_tail_size ; todo: get maximum tail size
+	rb	localize_tail_size
 
 libraryHookTail:
 appChangeHookTail:
@@ -1312,8 +1312,73 @@ cursor_tail_size = $ - cursor_tail
 localizeHookTail:
 	dl	localize_tail_size
 localize_tail:
-	or	a,a ; todo: actually implement
+; mostly taken from Iambian's font thing
+; see also https://pastebin.com/hhyLZSLL
+	cp	a,$0a
+	jr	nz,.not_menu_quasi
+	ld	hl,(hl)
+	cp	a,a
 	ret
+.not_menu_quasi:
+	cp	a,$3a
+	jr	z,.config_vars
+	cp	a,$3b
+	jr	nz,.not_data_types
+.config_vars:
+	or	a,a
+	ld	a,b
+	ret
+.not_data_types:
+	cp	a,$9F       ;catalog help. show "ARGUMENT FOR invNorm(" in fancy box
+	ret	z
+	cp	a,$C9       ;catalog help part 1 (token lookup)
+	ret	z
+	cp	a,$CA
+	ret	z
+	cp	a,$CB       ;catalog help part ? (draw help object)
+	ret	z
+	cp	a,$CC       ;catalog help part ?
+	ret	z
+	cp	a,$D8       ;catalog help part 2 (token render)
+	ret	z
+	cp	a,$7A       ;archive variable attempt failure message
+	ret	z
+	cp	a,$49
+	jr	z,.bugged49     ;matrix editor thing
+	cp	a,$4A
+	jr	z,.bugged4A     ;matrix editor thing
+	cp	a,$4B
+	jr	z,.bugged4B     ;matrix editor thing
+	cp	a,$4C
+	jr	z,.bugged4C     ;matrix editor thing. A really buggy bug there.
+	or	a,a
+
+	push	bc ; reset z flag
+	ld	b,a
+	xor	a,a
+	inc	a
+	ld	a,b
+	pop	bc
+	ret
+.bugged49:
+	ld	a,10
+	ret
+.bugged4A:
+	ld	a,13
+	ret
+.bugged4B:
+	ld	a,12
+	ret
+.bugged4C:  ;bugged. Used in matrix editor.
+	ld	a,$0A
+	ld	(curCol),a
+	ld	a,(currListHighlight)
+	call	_DispListElementOffLA
+	ld	a,(curCol)
+	cp	a,$0B
+	ret	nz
+	ld	a,$20
+	jp	_PutC
 localize_tail_size = $ - localize_tail
 
 
