@@ -18,9 +18,9 @@ public _set_key_hook
 public _hook_1_size
 
 include '../../src/hook_equates.inc'
+include '../../src/capnhook.inc'
 
 flags		equ	$D00080
-flag_continue	equ	10
 
 _hook_1: ; causes all A keypresses to become B
 	db	$83

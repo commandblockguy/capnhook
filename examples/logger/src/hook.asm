@@ -4,7 +4,7 @@ public _type_name_buffer
 
 extern _sprintf
 
-flag_continue	equ	10
+include '../../../src/capnhook.inc'
 
 _hook:
 	db	$83 ; Required for this to be recognized as a hook
