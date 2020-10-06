@@ -19,7 +19,6 @@ export hook_GetType
 export hook_GetPriority
 export hook_IsInstalled
 export hook_IsEnabled
-export hook_GetSize
 export hook_GetDescription
 export hook_CheckValidity
 
@@ -410,22 +409,6 @@ hook_IsEnabled:
 
 	ld	a,(ix+8)
 	ld	(hl),a
-	xor	a,a
-.pop_ix_ret:
-	pop	ix
-	ret
-
-hook_GetSize:
-	pop	de,bc,hl
-	push	hl,bc,de,ix,hl
-
-	call	get_entry_readonly
-	pop	hl
-	ld	a,HOOK_ERROR_NO_MATCHING_ID
-	jq	nc,.pop_ix_ret
-
-	ld	bc,(ix+9)
-	ld	(hl),bc
 	xor	a,a
 .pop_ix_ret:
 	pop	ix
