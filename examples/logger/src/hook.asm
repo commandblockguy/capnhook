@@ -1,11 +1,8 @@
-public _hook
-public _hook_size
-public _type_name_buffer
+include '../../../src/capnhook.inc'
 
 extern _sprintf
 
-include '../../../src/capnhook.inc'
-
+public _hook
 _hook:
 	db	$83 ; Required for this to be recognized as a hook
 	push	iy,ix,hl,de,bc,af
@@ -22,9 +19,11 @@ _hook:
 	ret
 .format_string:
 	db	"%12s: af:%04x bc:%06x de:%06x hl:%06x ix:%06x iy:%06x",$a,0
+public _type_name_buffer
 _type_name_buffer:
 	rb	16
 hook_size = $ - _hook
 
+public _hook_size
 _hook_size:
 	dl	hook_size

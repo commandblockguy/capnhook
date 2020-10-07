@@ -1,27 +1,9 @@
-public _hook_1
-public _hook_2
-public _hook_3
-public _hook_os
-
-public _hook_1_run
-public _hook_2_run
-public _hook_3_run
-public _hook_os_run
-
-public _clear_hook
-public _check_hook
-
-public _trigger_key_hook
-public _clear_key_hook
-public _set_key_hook
-
-public _hook_1_size
-
 include '../../src/hook_equates.inc'
 include '../../src/capnhook.inc'
 
 flags		equ	$D00080
 
+public _hook_1
 _hook_1: ; causes all A keypresses to become B
 	db	$83
 	ld	hl,_hook_1_run
@@ -32,9 +14,11 @@ _hook_1: ; causes all A keypresses to become B
 	inc	a
 	res	0,(iy - flag_continue)
 	ret
+public _hook_1_size
 _hook_1_size:
 	dl	$-_hook_1
 
+public _hook_2
 _hook_2: ; causes all C keypresses to become D
 	db	$83
 	ld	hl,_hook_2_run
@@ -46,6 +30,7 @@ _hook_2: ; causes all C keypresses to become D
 	res	0,(iy - flag_continue)
 	ret
 
+public _hook_3
 _hook_3: ; causes all D keypresses to become E
 	db	$83
 	ld	hl,_hook_3_run
@@ -57,6 +42,7 @@ _hook_3: ; causes all D keypresses to become E
 	res	0,(iy - flag_continue)
 	ret
 
+public _hook_os
 _hook_os: ; causes all F keypresses to become G
 	db	$83
 	ld	hl,_hook_os_run
@@ -66,11 +52,16 @@ _hook_os: ; causes all F keypresses to become G
 	inc	a
 	ret
 
+public _hook_1_run
 _hook_1_run:	db	0
+public _hook_2_run
 _hook_2_run:	db	0
+public _hook_3_run
 _hook_3_run:	db	0
+public _hook_os_run
 _hook_os_run:	db	0
 
+public _trigger_key_hook
 _trigger_key_hook:
 	ld	iy,0D00080h
 	xor	a,a
@@ -101,6 +92,7 @@ _trigger_key_hook:
 	ld	a,-1
 	ret
 
+public _clear_hook
 _clear_hook:
 	pop	bc,de
 	push	de,bc
@@ -116,6 +108,7 @@ _clear_hook:
 jp_hl:
 	jp	(hl)
 
+public _check_hook
 macro iypos flag,bit
 	db	flag,($46) or (bit shl 3)
 end macro
@@ -165,9 +158,11 @@ _check_hook:
 	iypos	 hookflags4,7	; SILENT_LINK
 	iypos	 hookflags5,0	; USB_ACTIVITY
 
+public _clear_key_hook
 _clear_key_hook:
 	ld	iy,flags
 	jp	_ClrRawKeyHook
+public _set_key_hook
 _set_key_hook:
 	pop	de,hl
 	push	hl,de
