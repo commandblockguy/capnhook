@@ -58,7 +58,7 @@ virtual at 0
 	HOOK_ERROR_UNKNOWN_DATABASE_VERSION	rb	1
 end virtual
 
-current_version		equ	2
+current_version		equ	3
 
 hook_Sync:
 	ld	a,(existing_checked)
@@ -168,7 +168,7 @@ hook_Install:
 	ret	nz
 	push	ix,hl
 
-	ld	bc,12 ; size of entry not including description
+	ld	bc,9 ; size of entry not including description
 	add	hl,bc
 	call	_EnoughMem
 	ld	a,HOOK_ERROR_INTERNAL_DATABASE_IO
@@ -234,8 +234,6 @@ hook_Install:
 	ld	(ix),bc
 	ld	bc,(iy+6) ; hook
 	ld	(ix+3),bc
-	ld	bc,(iy+9) ; size
-	ld	(ix+9),bc
 	ld	a,(iy+12) ; type
 	ld	(ix+6),a
 	ld	a,(iy+15) ; priority
@@ -243,7 +241,7 @@ hook_Install:
 	ld	a,1 ; enabled
 	ld	(ix+8),a
 
-	lea	ix,ix+12
+	lea	ix,ix+9
 	push	ix
 	pop	de,bc,ix
 	ld	hl,(iy+18)
@@ -425,7 +423,7 @@ hook_GetDescription:
 	ld	a,HOOK_ERROR_NO_MATCHING_ID
 	jq	nc,.pop_ix_ret
 
-	lea	ix,ix+12
+	lea	ix,ix+9
 	ld	(hl),ix
 	xor	a,a
 .pop_ix_ret:
@@ -564,7 +562,7 @@ skip_archive_header:
 
 ; ix: pointer to entry
 get_next:
-	lea	ix,ix+12 ; start of description
+	lea	ix,ix+9 ; start of description
 .loop:
 	ld	a,(ix)
 	or	a,a

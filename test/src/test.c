@@ -272,7 +272,6 @@ typedef struct {
     uint8_t type;			// enum for which OS hook to use
     uint8_t priority;		// process lowest priorities first
     bool enabled;
-    uint24_t size;
     char description[1];
 } user_hook_entry_t;
 
@@ -297,8 +296,8 @@ void debug_print_db(void) {
 
     dbg_sprintf(dbgout, "DB: %p | Size: %u | Version: %u\n", ptr, ti_GetSize(db), header.version);
     for(user_hook_entry_t *current = start; current < end; current = get_next(current)) {
-        dbg_sprintf(dbgout, "id: %06X | hook: %p | type: %2u | priority: %3u | enabled: %c | size: %u | description: %s\n",
-                    current->id, current->hook, current->type, current->priority, current->enabled ? 'T' : 'F', current->size, current->description);
+        dbg_sprintf(dbgout, "id: %06X | hook: %p | type: %2u | priority: %3u | enabled: %c | description: %s\n",
+                    current->id, current->hook, current->type, current->priority, current->enabled ? 'T' : 'F', current->description);
     }
     ti_Close(db);
 }
