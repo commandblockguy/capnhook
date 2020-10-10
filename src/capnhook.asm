@@ -99,10 +99,8 @@ hook_Sync:
 	ld	hl,db_name
 	call	_Mov9ToOP1
 	call	_ChkFindSym
-	jr	c,.deleted
-	call	_DelVarArc
+	call	nc,_DelVarArc
 
-.deleted:
 	ld	hl,temp_db_name
 	call	_Mov9ToOP1
 	call	_ChkFindSym
@@ -133,9 +131,7 @@ hook_Discard:
 	ld	hl,temp_db_name
 	call	_Mov9ToOP1
 	call	_ChkFindSym
-	jr	c,.deleted
-	call	_DelVarArc
-.deleted:
+	call	nc,_DelVarArc
 	xor	a,a
 	ld	(initted),a
 	ld	(database_modified),a
@@ -180,19 +176,34 @@ hook_Install:
 	sbc	hl,de
 	jq	z,.copied
 
-	push	iy,de
-	push	hl
-	ld	bc,(iy+6)
-	push	bc
-	ld	iy,flags
-	call	flash_relocate
-	pop	bc,bc,de,iy
+	; todo: check if exact copy of hook is already archived
 
-	add	hl,de ; check if null
-	or	a,a
-	sbc	hl,de
+	push	de,iy,hl
+	ld	hl,hook_id_hex
+	ld	a,(iy+5)
+	call	lazy_hex
+	ld	a,(iy+4)
+	call	lazy_hex
+	ld	a,(iy+3)
+	call	lazy_hex
+
+	ld	hl,hook_var_name
+	call	_Mov9ToOP1
+	pop	hl,iy
+
+	push	iy
+	ld	de,(iy+6)
+	call	archive
+	pop	iy
 	ld	a,HOOK_ERROR_NEEDS_GC
-	jq	z,.pop_exit
+	jq	nc,.pop_exit
+
+	ex	hl,de
+	ld	bc,20 ; skip archive header
+	add	hl,bc
+	pop	de
+	
+	
 
 	ld	(iy+6),hl
 .copied:
@@ -252,7 +263,7 @@ hook_Install:
 	xor	a,a
 	ret
 .pop_exit:
-	pop	bc,ix
+	ld	sp,iy
 	ret
 
 hook_Uninstall:
@@ -861,11 +872,9 @@ install_hooks:
 	or	a,a
 	ld	de,hooks_buf
 	sbc	hl,de
-	push	hl
-	push	de
 
 	call	flash_relocate
-	pop	bc,bc,bc
+	pop	bc
 	push	bc,hl,bc
 	call	install_individual_executor
 	pop	bc,bc
@@ -971,24 +980,48 @@ sort_by_priority:
 	inc	hl
 	ret
 
-; todo: should I use actual relocation for this?
-flash_relocate:
-	pop	de,bc,hl ; hl = size
-	push	hl,bc,de,bc
+; takes a byte in a, outputs two bytes in (hl) and increases hl by 2
+; destroys b
+lazy_hex:
+	ld	b,a
+	rra
+	rra
+	rra
+	rra
+	and	a,$f
+	add	a,'A'
+	ld	(hl),a
+	inc	hl
+	ld	a,b
+	and	a,$f
+	add	a,'A'
+	ld	(hl),a
+	inc	hl
+	ret
+
+; returns _ChkFindSym of the var
+; hl = size
+; de = memory location
+; sets iy to flags
+archive:
+	push	de,hl
 	ld	iy,flags
 
+	call	_ChkFindSym
+	call	nc,_DelVarArc
+
+	pop	hl
+
 	call	_EnoughMem
-	jq	c,.ret_null
+	jq	c,.ret_nc
 	push	de
 	ld	hl,12
 	add	hl,de
 	push	hl
 	pop	bc
 	call	_FindFreeArcSpot
-	jq	z,.ret_null
+	jq	z,.ret_nc
 
-	ld	hl,temp_var_name
-	call	_Mov9ToOP1
 	call	_PushOP1
 
 	pop	hl ; hl = size
@@ -1002,7 +1035,23 @@ flash_relocate:
 
 	call	_PopOP1
 	call	_Arc_Unarc
+	call	_ChkFindSym
+	ccf
+	ret
+.ret_nc:
+	pop	hl
+	or	a,a
+	ret
 
+; todo: should I use actual relocation for this?
+; relocates to somewhere in flash until the next GC
+flash_relocate:
+	push	hl,de
+	ld	hl,temp_var_name
+	call	_Mov9ToOP1
+	pop	de,hl
+	call	archive
+	jq	nc,.ret_null
 	call	_ChkFindSym
 	push	de
 	call	_DelVarArc
@@ -1011,7 +1060,6 @@ flash_relocate:
 	add	hl,bc
 	ret
 .ret_null:
-	pop	hl
 	ld	hl,0
 	ret
 
@@ -1026,10 +1074,9 @@ install_main_executor:
 	add	hl,de
 	ld	(main_executor_call_location),hl
 
-	ld	bc,main_executor
-	push	bc
+	ld	de,main_executor
+	pop	hl
 	call	flash_relocate
-	pop	bc,bc
 	ret
 
 ; void install_individual_executor(hook_type_t type, hook_t *table)
@@ -1061,11 +1108,8 @@ install_individual_executor:
 
 	ld	bc,individual_executor_size
 	add	hl,bc
-	push	hl
-	ld	bc,individual_executor
-	push	bc
+	ld	de,individual_executor
 	call	flash_relocate
-	pop	bc,bc
 	add	hl,de
 	or	a,a
 	sbc	hl,de
@@ -1452,3 +1496,7 @@ db_name:
 	db	AppVarObj,"HOOKSDB",0
 temp_var_name:
 	db	AppVarObj,"TMP",0,0,0,0,0
+hook_var_name:
+	db	AppVarObj,"HK"
+hook_id_hex:
+	rb	7
