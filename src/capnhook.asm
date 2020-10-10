@@ -243,8 +243,17 @@ hook_Install:
 
 	ld	bc,(iy+3) ; id
 	ld	(ix),bc
+
+	ld	bc,0
+	ld	hl,(iy+9) ; check if size is zero
+	add	hl,de
+	or	a,a
+	sbc	hl,de
+	jq	nz,.set_hook_ptr
 	ld	bc,(iy+6) ; hook
+.set_hook_ptr:
 	ld	(ix+3),bc
+
 	ld	a,(iy+12) ; type
 	ld	(ix+6),a
 	ld	a,(iy+15) ; priority
@@ -266,6 +275,7 @@ hook_Install:
 	ld	sp,iy
 	ret
 
+; todo: actually delete the hook from the filesystem
 hook_Uninstall:
 	pop	de,bc
 	push	bc,de,ix
@@ -346,7 +356,22 @@ hook_GetHook:
 	ld	a,HOOK_ERROR_NO_MATCHING_ID
 	jq	nc,.pop_ix_ret
 
-	ld	de,(ix+3)
+	push	hl
+
+	ld	hl,(ix+3) ; check if hook is non-null
+	add	hl,de
+	or	a,a
+	sbc	hl,de
+	jq	nz,.hl_has_hook
+
+	; check for hook appvar
+	ld	ix,(ix)
+	call	get_hook_address
+	jq	nc,.hl_has_hook
+	ld	hl,0 ; return NULL if not found
+.hl_has_hook:
+	ex	hl,de
+	pop	hl
 	ld	(hl),de
 	xor	a,a
 .pop_ix_ret:
@@ -789,10 +814,9 @@ install_hooks:
 	add	hl,de
 	or	a,a
 	sbc	hl,de
-	jq	nz,.main_executor_installed
 	ld	a,HOOK_ERROR_NEEDS_GC
-	ret
-.main_executor_installed:
+	ret	z
+
 	call	open_readonly
 	ld	a,HOOK_ERROR_INTERNAL_DATABASE_IO
 	ret	nc
@@ -831,11 +855,6 @@ install_hooks:
 	cp	a,c
 	jq	nz,.skip
 
-	ld	hl,(ix+3)
-	ld	a,$83
-	cp	a,(hl)
-	jq	nz,.skip
-
 	bit	0,(ix+8)
 	jq	z,.skip
 
@@ -849,8 +868,27 @@ install_hooks:
 	ld	a,(ix+7)
 	ld	(hl),a
 	inc	hl
-	ld	bc,(ix+3) ; hook ptr
-	ld	(hl),bc
+
+	push	de,hl
+	ld	hl,(ix+3)
+	add	hl,de
+	or	a,a
+	sbc	hl,de
+	jq	nz,.hook_ptr_in_hl
+
+	push	ix
+	ld	ix,(ix) ; id
+	call	get_hook_address
+	pop	ix
+
+.hook_ptr_in_hl:
+	ld	a,(hl)
+	cp	a,$83
+	ex	hl,de
+	pop	hl
+	ld	(hl),de ; add hook to array
+	pop	de
+	jq	nz,.skip
 
 	ld	a,(.num_hooks)
 	inc	a
@@ -980,6 +1018,7 @@ sort_by_priority:
 	inc	hl
 	ret
 
+; todo: maybe replace with an actual hex function, written by someone smarter than I am and actually tested
 ; takes a byte in a, outputs two bytes in (hl) and increases hl by 2
 ; destroys b
 lazy_hex:
@@ -997,6 +1036,33 @@ lazy_hex:
 	add	a,'A'
 	ld	(hl),a
 	inc	hl
+	ret
+
+; ix: id of the hook
+; returns address of the hook in hl
+; returns with carry set if not found
+; sets iy to flags
+; destroys de, bc
+; todo: handle idiot users unarchiving variables
+get_hook_address:
+	ld	(scrapMem),ix
+	ld	hl,hook_id_hex
+	ld	a,(scrapMem+2)
+	call	lazy_hex
+	ld	a,ixh
+	call	lazy_hex
+	ld	a,ixl
+	call	lazy_hex
+
+	ld	hl,hook_var_name
+	ld	iy,flags
+	call	_Mov9ToOP1
+	call	_ChkFindSym
+	ret	c
+
+	ex	hl,de
+	ld	bc,20
+	add	hl,bc
 	ret
 
 ; returns _ChkFindSym of the var
