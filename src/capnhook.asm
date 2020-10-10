@@ -60,6 +60,7 @@ end virtual
 
 current_version		equ	3
 
+; todo: delete uninstalled hooks from the filesystem
 hook_Sync:
 	ld	a,(existing_checked)
 	or	a,a
@@ -127,6 +128,9 @@ hook_Sync:
 .not_modified:
 	jq	hook_Discard
 
+; todo: delete any hooks not present in the new DB
+; todo: I guess I also have to revert any hooks that were overwritten?
+; that sounds like a lot of work, might just note that it doesn't do that in the docs
 hook_Discard:
 	ld	hl,temp_db_name
 	call	_Mov9ToOP1
@@ -275,7 +279,6 @@ hook_Install:
 	ld	sp,iy
 	ret
 
-; todo: actually delete the hook from the filesystem
 hook_Uninstall:
 	pop	de,bc
 	push	bc,de,ix
@@ -809,6 +812,7 @@ insert_existing:
 .entry:
 	db	0,0,0, 0,0,0, 0, $ff, 1, 0
 
+; todo: should I rewrite this to install an app?
 install_hooks:
 	call	install_main_executor
 	add	hl,de

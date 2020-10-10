@@ -186,3 +186,5 @@ hook_error_t hook_GetDescription(uint24_t id, char **result);
  * invalid, or another error
  */
 hook_error_t hook_CheckValidity(uint24_t id);
+
+// todo: a function to iterate through all hook IDs
