@@ -16,7 +16,7 @@ extern bool hook_1_run, hook_2_run, hook_3_run, hook_os_run;
 
 uint8_t trigger_key_hook(uint8_t a);
 void set_key_hook(hook_t *hook);
-void set_existing_checked(uint8_t val);
+bool set_existing_checked(uint8_t val);
 
 bool check_hook(uint24_t type);
 void clear_hook(uint24_t type);
@@ -158,7 +158,8 @@ bool check_tests(void) {
     ASSERT_EQUAL(hook_3_run, false);
     ASSERT_EQUAL(hook_os_run, true);
 
-    set_existing_checked(false);
+    err = set_existing_checked(false);
+    ASSERT_EQUAL(err, true);
     ASSERT_EQUAL(hook_Sync(), HOOK_SUCCESS);
     debug_print_db();
     err = hook_IsInstalled(HOOK_TYPE_RAW_KEY, &installed);
@@ -203,10 +204,10 @@ bool check_tests(void) {
     ASSERT_EQUAL(hook_3_run, true);
 
     // Check that enabling an invalid hook gives an error
-    ((char*)&hook_1)[0] = 0x42;
+    *(uint8_t*)&hook_1 = 0x42;
     err = hook_Enable(0xFF0001);
     ASSERT_EQUAL(err, HOOK_ERROR_INVALID_USER_HOOK);
-    ((char*)&hook_1)[0] = 0x83;
+    *(uint8_t*)&hook_1 = 0x83;
 
     // Re-enable hook
     err = hook_Enable(0xFF0001);
@@ -315,17 +316,20 @@ void debug_print_db(void) {
     ti_Close(db);
 }
 
-char *memmem(void *haystack, void *needle, size_t needle_size) { //ish
-    for(char *curr = haystack; ; curr++) {
+char *memmem(void *haystack, size_t haystack_size, void *needle, size_t needle_size) { //ish
+    for(char *curr = haystack; curr < &haystack[haystack_size - needle_size]; curr++) {
         if(memcmp(curr, needle, needle_size) == 0) return curr;
     }
+    return NULL;
 }
 
 // This is basically guaranteed to get me stabbed by Mateo.
 // Whatever, it's just a test function.
-void set_existing_checked(uint8_t val) {
+bool set_existing_checked(uint8_t val) {
     int target[] = {0x0213C4}; // _SetCursorHook
     void *start = ((struct {uint8_t call; void *ptr;}*)&hook_CheckValidity)->ptr;
-    char *loc = memmem(start, target, sizeof target);
+    char *loc = memmem(start, 5000, target, sizeof target);
+    if(!loc) return false;
     loc[-2] = val;
+    return true;
 }
