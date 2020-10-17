@@ -71,14 +71,12 @@ hook_error_t hook_Discard(void);
 /**
  * Installs a hook.
  *
- * If @param size is nonzero, a copy of @param hook will be created which
- * persists across RAM resets and garbage collects.
+ * If @param size is nonzero, a copy of @param hook will be created.
  * As a result, @param hook must be position-independent.
  *
  * If @param size is zero, @param hook will not be copied but used in-place.
  * This is not recommended except for apps, as hooks stored in RAM will
- * become invalid after the program exits and hooks stored in the archive
- * will become invalid after a garbage collect.
+ * become invalid after the program exits.
  *
  * If another hook with the same ID is already installed, the old hook will be
  * replaced with the new one. The old hook's priority will be preserved.
