@@ -285,9 +285,13 @@ hook_SetPriority:
 	ld	a,HOOK_ERROR_NO_MATCHING_ID ; close enough
 	jq	z,.exit
 
-	; ld a, 1 (already the case because HOOK_ERROR_NO_MATCHING_ID = 1)
-	ld	(database_modified),a ; todo: only mark modified if changed
+	ld	a,(ix+7) ; priority
+	sub	a,c
+	jq	z,.exit ; skip if priority is already equal to c
+
 	ld	(ix+7),c
+	ld	a,1
+	ld	(database_modified),a
 
 	xor	a,a
 .exit:
@@ -301,12 +305,22 @@ hook_Enable:
 	or	a,a
 	jq	nz,.exit
 
-	; todo: check that hook is still valid
+	; check that hook is still valid
+	ld	hl,(ix+3)
+	ld	a,$83
+	cp	a,(hl)
+	ld	a,HOOK_ERROR_INVALID_USER_HOOK
+	jr	nz,.exit
 
-	ld	a,1
-	ld	(database_modified),a ; todo: only mark modified if previously disabled
+	xor	a,a
+	cp	a,(ix+8) ; only mark modified if previously disabled
+	jq	nz,.skip
+
+	inc	a
+	ld	(database_modified),a
 	ld	(ix+8),a
 
+.skip:
 	xor	a,a
 .exit:
 	pop	ix
@@ -319,11 +333,15 @@ hook_Disable:
 	or	a,a
 	jq	nz,.exit
 
-	ld	a,1
-	ld	(database_modified),a ; todo: only mark modified if previously enabled
+	cp	a,(ix+8) ; only mark modified if previously enabled
+	jq	z,.exit
+
+	ld	(ix+8),a ; disable hook
+
+	inc	a
+	ld	(database_modified),a
 
 	xor	a,a
-	ld	(ix+8),a
 .exit:
 	pop	ix
 	ret
@@ -691,7 +709,7 @@ remove_entry:
 	pop	de
 	pop	ix ; hl: pointer to size
 	ld	hl,0
-	ld	l,(ix) ; todo: figure out what this is doing
+	ld	l,(ix)
 	ld	h,(ix+1)
 	or	a,a
 	sbc	hl,de
@@ -975,7 +993,6 @@ sort_by_priority:
 	inc	hl
 	ret
 
-; todo: should I use actual relocation for this?
 flash_relocate:
 	pop	de,bc,hl ; hl = size
 	push	hl,bc,de,bc
@@ -1023,7 +1040,15 @@ flash_relocate:
 install_main_executor:
 	ld	hl,main_executor_size
 	push	hl
-	call	find_install_location
+
+	ld	bc,12 ; finds the next install location
+	add	hl,bc
+	push	hl
+	pop	bc
+	call	_FindFreeArcSpot
+	ld	bc,15
+	add	hl,bc
+
 	ld	(main_executor_location),hl
 
 	ld	de,main_executor_call_destination - main_executor
@@ -1103,18 +1128,6 @@ install_individual_executor:
 
 jmp_ix:
 	jp	(ix)
-
-; takes size in hl, returns ptr in hl
-; todo: is this only called in one place?
-find_install_location:
-	ld	bc,12
-	add	hl,bc
-	push	hl
-	pop	bc
-	call	_FindFreeArcSpot
-	ld	bc,15
-	add	hl,bc
-	ret
 
 macro iypos flag,bit
 	db	flag,($46) or (bit shl 3)
@@ -1270,7 +1283,12 @@ fontHookTail:
 silentLinkHookTail:
 	dl	ret_nz_tail_size
 ret_nz_tail:
-	or	a,a ; todo: actually reset z even if a is 0
+	push	bc ; reset z flag
+	ld	b,a ; todo: faster way to do this?
+	xor	a,a
+	inc	a
+	ld	a,b
+	pop	bc
 	ret
 ret_nz_tail_size = $ - ret_nz_tail
 

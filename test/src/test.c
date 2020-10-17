@@ -202,6 +202,12 @@ bool check_tests(void) {
     ASSERT_EQUAL(hook_2_run, true);
     ASSERT_EQUAL(hook_3_run, true);
 
+    // Check that enabling an invalid hook gives an error
+    ((char*)&hook_1)[0] = 0x42;
+    err = hook_Enable(0xFF0001);
+    ASSERT_EQUAL(err, HOOK_ERROR_INVALID_USER_HOOK);
+    ((char*)&hook_1)[0] = 0x83;
+
     // Re-enable hook
     err = hook_Enable(0xFF0001);
     ASSERT_EQUAL(err, 0);
