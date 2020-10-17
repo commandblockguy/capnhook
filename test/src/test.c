@@ -16,6 +16,7 @@ extern bool hook_1_run, hook_2_run, hook_3_run, hook_os_run;
 
 uint8_t trigger_key_hook(uint8_t a);
 void set_key_hook(hook_t *hook);
+void set_existing_checked(uint8_t val);
 
 bool check_hook(uint24_t type);
 void clear_hook(uint24_t type);
@@ -148,35 +149,41 @@ bool check_tests(void) {
     ASSERT_EQUAL(hook_2_run, true);
     ASSERT_EQUAL(hook_3_run, false);
 
-    // todo: re-enable somehow?
     // Check that imported OS hooks behave correctly
-//    set_key_hook(&hook_os);
-//    a = trigger_key_hook(0x9F);
-//    ASSERT_EQUAL(a, 0xA0);
-//    ASSERT_EQUAL(hook_1_run, false);
-//    ASSERT_EQUAL(hook_2_run, false);
-//    ASSERT_EQUAL(hook_3_run, false);
-//    ASSERT_EQUAL(hook_os_run, true);
+    set_key_hook(&hook_os);
+    a = trigger_key_hook(0x9F);
+    ASSERT_EQUAL(a, 0xA0);
+    ASSERT_EQUAL(hook_1_run, false);
+    ASSERT_EQUAL(hook_2_run, false);
+    ASSERT_EQUAL(hook_3_run, false);
+    ASSERT_EQUAL(hook_os_run, true);
 
-//    existing_checked = false;
-//    ASSERT_EQUAL(hook_Sync(), HOOK_SUCCESS);
-//    debug_print_db();
-//    err = hook_IsInstalled(HOOK_TYPE_RAW_KEY, &installed);
-//    ASSERT_EQUAL(err, HOOK_SUCCESS);
-//    ASSERT_EQUAL(installed, true);
-//    err = hook_GetPriority(HOOK_TYPE_RAW_KEY, &priority);
-//    ASSERT_EQUAL(err, HOOK_SUCCESS);
-//    ASSERT_EQUAL(priority, 255);
-//    err = hook_GetType(HOOK_TYPE_RAW_KEY, &type);
-//    ASSERT_EQUAL(err, HOOK_SUCCESS);
-//    ASSERT_EQUAL(type, HOOK_TYPE_RAW_KEY);
+    set_existing_checked(false);
+    ASSERT_EQUAL(hook_Sync(), HOOK_SUCCESS);
+    debug_print_db();
+    err = hook_IsInstalled(HOOK_TYPE_RAW_KEY, &installed);
+    ASSERT_EQUAL(err, HOOK_SUCCESS);
+    ASSERT_EQUAL(installed, true);
+    err = hook_GetType(HOOK_TYPE_RAW_KEY, &type);
+    ASSERT_EQUAL(err, HOOK_SUCCESS);
+    ASSERT_EQUAL(type, HOOK_TYPE_RAW_KEY);
+    err = hook_GetPriority(HOOK_TYPE_RAW_KEY, &priority);
+    ASSERT_EQUAL(err, HOOK_SUCCESS);
+    ASSERT_EQUAL(priority, 255);
 
-//    a = trigger_key_hook(0x9F);
-//    ASSERT_EQUAL(a, 0xA0);
-//    ASSERT_EQUAL(hook_1_run, true);
-//    ASSERT_EQUAL(hook_2_run, true);
-//    ASSERT_EQUAL(hook_3_run, true);
-//    ASSERT_EQUAL(hook_os_run, true);
+    // ensure that we can't change the priority of OS hooks
+    err = hook_SetPriority(HOOK_TYPE_RAW_KEY, 42);
+    ASSERT_EQUAL(err, HOOK_ERROR_NO_MATCHING_ID);
+    err = hook_GetPriority(HOOK_TYPE_RAW_KEY, &priority);
+    ASSERT_EQUAL(err, HOOK_SUCCESS);
+    ASSERT_EQUAL(priority, 255);
+
+    a = trigger_key_hook(0x9F);
+    ASSERT_EQUAL(a, 0xA0);
+    ASSERT_EQUAL(hook_1_run, true);
+    ASSERT_EQUAL(hook_2_run, true);
+    ASSERT_EQUAL(hook_3_run, true);
+    ASSERT_EQUAL(hook_os_run, true);
 
     // Disable a hook
     err = hook_Disable(0xFF0001);
@@ -300,4 +307,19 @@ void debug_print_db(void) {
                     current->id, current->hook, current->type, current->priority, current->enabled ? 'T' : 'F', current->description);
     }
     ti_Close(db);
+}
+
+char *memmem(void *haystack, void *needle, size_t needle_size) { //ish
+    for(char *curr = haystack; ; curr++) {
+        if(memcmp(curr, needle, needle_size) == 0) return curr;
+    }
+}
+
+// This is basically guaranteed to get me stabbed by Mateo.
+// Whatever, it's just a test function.
+void set_existing_checked(uint8_t val) {
+    int target[] = {0x0213C4}; // _SetCursorHook
+    void *start = ((struct {uint8_t call; void *ptr;}*)&hook_CheckValidity)->ptr;
+    char *loc = memmem(start, target, sizeof target);
+    loc[-2] = val;
 }

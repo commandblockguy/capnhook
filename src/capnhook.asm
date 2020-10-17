@@ -279,9 +279,13 @@ hook_SetPriority:
 	or	a,a
 	jq	nz,.exit
 
-	; todo: check that this is not an imported OS hook
+	; check that this is not an imported OS hook
+	ld	a,(ix+1) ; upper two bytes of hook
+	or	a,(ix+2)
+	ld	a,HOOK_ERROR_NO_MATCHING_ID ; close enough
+	jq	z,.exit
 
-	ld	a,1
+	; ld a, 1 (already the case because HOOK_ERROR_NO_MATCHING_ID = 1)
 	ld	(database_modified),a ; todo: only mark modified if changed
 	ld	(ix+7),c
 
