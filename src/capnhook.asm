@@ -21,6 +21,7 @@ export hook_IsInstalled
 export hook_IsEnabled
 export hook_GetDescription
 export hook_CheckValidity
+export hook_Next
 
 include	"hook_equates.inc"
 
@@ -470,6 +471,59 @@ hook_CheckValidity:
 	pop	ix
 	ret
 
+hook_Next:
+	push	ix
+	call	open_readonly
+	ld	a,HOOK_ERROR_INTERNAL_DATABASE_IO
+	jq	nc,.exit2
+
+	pop	bc,de,hl
+	push	hl,de,bc,hl
+	ld	bc,(hl) ; last entry
+
+	call	get_start_end
+	
+	sbc	hl,hl ; check if bc is -1
+	inc	hl
+	adc	hl,bc
+	jq	z,.return_this
+
+.loop:
+	or	a,a
+	push	ix
+	pop	hl
+	sbc	hl,de
+	ld	a,HOOK_ERROR_NO_MATCHING_ID
+	jq	nc,.exit
+
+	ld	hl,(ix) ; hl = id of current entry
+	or	a,a
+	sbc	hl,bc
+	jq	z,.return_next
+
+	call	get_next
+	jq	.loop
+
+.return_next:
+	call	get_next
+.return_this:
+	ld	bc,(ix)
+	or	a,a
+	push	ix
+	pop	hl
+	sbc	hl,de
+	ld	a,HOOK_ERROR_NO_MATCHING_ID
+	jq	nc,.exit
+
+	xor	a,a
+
+.exit:
+	pop	hl
+	ld	(hl),bc
+.exit2:
+	pop	ix
+	ret
+
 init:
 	ld	iy,flags
 	; check if temp DB already exists
@@ -592,11 +646,10 @@ get_next:
 	jr	nz,.loop
 	ret
 
-; bc: entry id
-; ix: pointer to size bytes of appvar
-; returns pointer to entry in ix
-; carry flag set if found
-get_entry:
+; ix: ptr to size bytes of appvar
+; returns end of file in de
+; returns pointer to first entry in ix
+get_start_end:
 	ld	de,0
 	ld	e,(ix)
 	ld	d,(ix+1)
@@ -605,6 +658,14 @@ get_entry:
 	push	iy
 	pop	de
 	lea	ix,ix+5 ; ix: pointer to first entry
+	ret
+
+; bc: entry id
+; ix: pointer to size bytes of appvar
+; returns pointer to entry in ix
+; carry flag set if found
+get_entry:
+	call	get_start_end
 .loop:
 	or	a,a
 	push	ix

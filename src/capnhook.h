@@ -186,3 +186,13 @@ hook_error_t hook_GetDescription(uint24_t id, char **result);
  * invalid, or another error
  */
 hook_error_t hook_CheckValidity(uint24_t id);
+
+/**
+ * Iterate through all hook IDs one at a time.
+ *
+ * @param id Set to the current hook ID. Set this to -1 to start searching.
+ * @return HOOK_SUCCESS if @param id was set to the next hook ID,
+ * HOOK_ERROR_NO_MATCHING_HOOK once all IDs have already been seen, or another
+ * error
+ */
+hook_error_t hook_Next(uint24_t *id);

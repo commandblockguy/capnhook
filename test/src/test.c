@@ -26,8 +26,6 @@ void debug_print_db(void);
 #define ASSERT(cond) if(!(cond)) {dbg_sprintf((char*)dbgout, "Assertion failed on line %u\n", __LINE__); return false;} else dbg_sprintf((char*)dbgout, "Assertion passed on line %u\n", __LINE__)
 #define ASSERT_EQUAL(var, known) if(var != known) {dbg_sprintf((char*)dbgout, "Assertion failed on line %u, value 0x%X\n", __LINE__, (int)var); return false;} else dbg_sprintf((char*)dbgout, "Assertion passed on line %u\n", __LINE__)
 
-// todo: test installing hooks with an actual size
-
 bool check_tests(void) {
     uint8_t priority;
     uint8_t type;
@@ -35,6 +33,7 @@ bool check_tests(void) {
     hook_t *hook;
     hook_error_t err;
     bool installed;
+    uint24_t id, old_id;
     // Assume that the calc has been freshly reset
     // Delete old hook db
     ti_CloseAll();
@@ -239,6 +238,37 @@ bool check_tests(void) {
 
     err = hook_CheckValidity(0xFF0001);
     ASSERT_EQUAL(err, HOOK_SUCCESS);
+
+    // Test hook_Next
+    id = -1;
+    err = hook_Next(&id);
+    ASSERT_EQUAL(err, 0);
+    err = hook_CheckValidity(id);
+    ASSERT_EQUAL(err, HOOK_SUCCESS);
+
+    old_id = id;
+    err = hook_Next(&id);
+    ASSERT_EQUAL(err, 0);
+    err = hook_CheckValidity(id);
+    ASSERT_EQUAL(err, HOOK_SUCCESS);
+    ASSERT(id != old_id);
+
+    old_id = id;
+    err = hook_Next(&id);
+    ASSERT_EQUAL(err, 0);
+    err = hook_CheckValidity(id);
+    ASSERT_EQUAL(err, HOOK_SUCCESS);
+    ASSERT(id != old_id);
+
+    old_id = id;
+    err = hook_Next(&id);
+    ASSERT_EQUAL(err, 0);
+    err = hook_CheckValidity(id);
+    ASSERT_EQUAL(err, HOOK_SUCCESS);
+    ASSERT(id != old_id);
+
+    err = hook_Next(&id);
+    ASSERT_EQUAL(err, HOOK_ERROR_NO_MATCHING_ID);
 
     // Uninstall hook
     err = hook_Uninstall(0xFF0001);
