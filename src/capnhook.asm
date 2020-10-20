@@ -62,6 +62,7 @@ end virtual
 current_version		equ	3
 
 hook_Sync:
+	ld	iy,flags
 	ld	a,(existing_checked)
 	or	a,a
 	push	ix
@@ -83,6 +84,7 @@ hook_Sync:
 	ld	a,HOOK_ERROR_INTERNAL_DATABASE_IO
 	ret	c
 	call	_ChkInRam
+	ld	a,HOOK_ERROR_INTERNAL_DATABASE_IO
 	ret	nz
 
 	ex	hl,de ; hl = pointer to size
@@ -108,7 +110,7 @@ hook_Sync:
 	call	_Mov9ToOP1
 	call	_ChkFindSym
 
-	ld	a,HOOK_ERROR_INTERNAL_DATABASE_IO
+	ld	a,HOOK_ERROR_DATABASE_CORRUPTED
 	ret	c
 
 	ld	de,-13
@@ -861,10 +863,9 @@ install_hooks:
 	add	hl,de
 	or	a,a
 	sbc	hl,de
-	jq	nz,.main_executor_installed
 	ld	a,HOOK_ERROR_NEEDS_GC
-	ret
-.main_executor_installed:
+	ret	z
+
 	call	open_readonly
 	ld	a,HOOK_ERROR_INTERNAL_DATABASE_IO
 	ret	nc
