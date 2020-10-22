@@ -12,7 +12,7 @@ ARCHIVED     ?= NO
 # Compile Options
 # ----------------------------
 
-OPT_MODE     ?= -Oz
+OPT_MODE     ?= -O0
 EXTRA_CFLAGS ?= -Wall -Wextra
 
 # ----------------------------
