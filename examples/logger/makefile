@@ -12,8 +12,7 @@ ARCHIVED     ?= NO
 # Compile Options
 # ----------------------------
 
-OPT_MODE     ?= -O2
-EXTRA_CFLAGS ?= -Wall -Wextra
+CFLAGS ?= -Wall -Wextra -Oz
 
 # ----------------------------
 # Debug Options
@@ -21,4 +20,4 @@ EXTRA_CFLAGS ?= -Wall -Wextra
 
 OUTPUT_MAP   ?= NO
 
-include $(CEDEV)/include/.makefile
+include $(CEDEV)/meta/makefile.mk

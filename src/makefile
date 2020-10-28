@@ -40,13 +40,13 @@ LIB_H      :=$(NAME).h
 
 all: $(LIB_8XV)
 
-$(LIB_8XV): $(SRC)
+$(LIB_8XV) $(LIB): $(SRC)
 	$(FASMG) $< $@
 
 clean:
 	$(RM) $(LIB) $(LIB_8XV)
 
-install:
+install: $(LIB_H) $(LIB)
 	$(CP) $(LIB_H) $(H_LOC)
 	$(CP) $(LIB) $(I_LOC)
 
