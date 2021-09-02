@@ -1,6 +1,6 @@
 include '../../../src/capnhook.inc'
 
-extern _sprintf
+_sprintf = $0000BC
 
 public _hook
 _hook:

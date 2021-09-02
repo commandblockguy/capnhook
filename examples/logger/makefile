@@ -2,7 +2,7 @@
 # Program Options
 # ----------------------------
 
-NAME         ?= DEMO
+NAME         ?= HOOKLOG
 ICON         ?= icon.png
 DESCRIPTION  ?= "Cap'n Hook Test Program"
 COMPRESSED   ?= NO
@@ -18,6 +18,6 @@ CFLAGS ?= -Wall -Wextra -Oz
 # Debug Options
 # ----------------------------
 
-OUTPUT_MAP   ?= NO
+OUTPUT_MAP   ?= YES
 
 include $(CEDEV)/meta/makefile.mk

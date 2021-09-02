@@ -36,7 +36,6 @@ bool check_tests(void) {
     uint24_t id, old_id;
     // Assume that the calc has been freshly reset
     // Delete old hook db
-    ti_CloseAll();
     ti_Delete("HOOKSDB");
     ti_Delete("HOOKTMP");
     debug_print_db();
