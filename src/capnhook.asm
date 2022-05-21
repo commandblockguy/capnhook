@@ -937,8 +937,21 @@ install_hooks:
 .entry_loop_break:
 	ld	a,(.num_hooks)
 	or	a,a
-	jq	z,.type_loop
+	jq	nz,.has_enabled_hooks
 
+; clear hook of this type
+	push	ix,bc
+	ld	hl,hook_clearers
+	add	hl,bc
+	add	hl,bc
+	add	hl,bc
+	ld	ix,(hl)
+	ld	iy,flags
+	call	jmp_ix
+	pop	bc,ix
+	jq	.type_loop
+
+.has_enabled_hooks:
 	ld	b,a
 	call	sort_by_priority
 
@@ -1494,6 +1507,30 @@ hook_setters:
 	dl	_SetLocalizeHook
 	dl	_SetSilentLinkHook
 	dl	_SetUSBActivityHook
+hook_clearers:
+	dl	_ClrCursorHook
+	dl	_ClrLibraryHook
+	dl	_ClrRawKeyHook
+	dl	_ClrGetKeyHook
+	dl	_ClrHomescreenHook
+	dl	_ClrWindowHook
+	dl	_ClrGraphModeHook
+	dl	_ClrYeditHook
+	dl	_ClrFontHook
+	dl	_ClrRegraphHook
+	dl	_ClrGraphicsHook
+	dl	_ClrTraceHook
+	dl	_ClrParserHook
+	dl	_ClrAppChangeHook
+	dl	_ClrCatalog1Hook
+	dl	_ClrHelpHook
+	dl	_ClrCxReDispHook
+	dl	_ClrMenuHook
+	dl	_ClrCatalog2Hook
+	dl	_ClrTokenHook
+	dl	_ClrLocalizeHook
+	dl	_ClrSilentLinkHook
+	dl	_ClrUSBActivityHook
 hook_addresses:
 	dl	cursorHookPtr
 	dl	libraryHookPtr
