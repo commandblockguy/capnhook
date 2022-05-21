@@ -20,4 +20,4 @@ CFLAGS ?= -Wall -Wextra -Oz
 
 OUTPUT_MAP   ?= NO
 
-include $(CEDEV)/meta/makefile.mk
+include $(shell cedev-config --makefile)

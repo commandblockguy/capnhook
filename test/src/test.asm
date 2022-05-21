@@ -1,6 +1,8 @@
 include '../../src/hook_equates.inc'
 include '../../src/capnhook.inc'
 
+section	.text
+
 flags		equ	$D00080
 
 public _hook_1
