@@ -1302,6 +1302,9 @@ main_executor_size = $-main_executor
 
 individual_executor:
 	db	'm', $83
+	jr	.skip_version
+	db	5,6 ; version number
+.skip_version:
 	push	ix
 	ld	ix,0
 individual_executor_table = $-3
@@ -1333,7 +1336,6 @@ parserHookTail:
 catalog1HookTail:
 cxRedispHookTail:
 menuHookTail:
-catalog2HookTail:
 	dl	ret_z_tail_size
 ret_z_tail:
 	cp	a,a
@@ -1445,6 +1447,17 @@ localize_tail:
 	ld	a,$20
 	jp	_PutC
 localize_tail_size = $ - localize_tail
+
+catalog2HookTail:
+	dl	catalog2_tail_size
+catalog2_tail:
+	; return z set for a = 4, 1
+	; return z reset for a = 7, 8
+	cp	a,1
+	ret	z
+	cp	a,4
+	ret
+catalog2_tail_size = $ - catalog2_tail
 
 
 main_executor_location:
