@@ -44,17 +44,48 @@ enum {
 };
 typedef uint8_t hook_error_t;
 
-/**
- * A hook in memory, as described in
- * https://wikiti.brandonw.net/index.php?title=83Plus:OS:Hooks
- *
- * Installing and chaining is handled automatically by this library.
- *
- * Additionally, your hook should reset bit 0 of (flags-10) when returning a
- * value to the OS, or set the bit if other hooks of the same type should be
- * processed.
- */
-typedef void hook_t;
+struct hook_info {
+    /**
+     * A unique id for the hook. This must be unique among all programs
+     * that use this library. You should register your ID on this page:
+     * https://github.com/commandblockguy/capnhook/wiki/Hook-ID-Registry
+     */
+    uint24_t id;
+    /**
+     * Determines what type of OS event the hook will trigger on.
+     */ 
+    hook_type type;
+    /**
+     * A pointer to a hook, as described in
+     * https://wikiti.brandonw.net/index.php?title=83Plus:OS:Hooks
+     * 
+     * This hook should not include chaining code, since that is handled
+     * automatically by capnhook. Instead, it should reset bit 0 of (flags-10)
+     * when returning a value to the OS, or set the bit if other hooks of the
+     * same type should be processed.
+     */
+    void *pointer;
+    /**
+     * The type byte and name of a variable. If not empty, `pointer` will be
+     * used as an offset relative to the start of this variable rather than an
+     * absolute pointer.
+     */
+    char variable[9];
+    /**
+     * Hooks with lower priority values are called before hooks with higher
+     * priorities.
+     */
+    uint8_t priority;
+    /**
+     * Whether this hook is currently enabled.
+     */
+    bool enabled;
+    /**
+     * A human-readable description of the hook, up to 255 characters long.
+     */
+    const char *description;
+    const uint8_t reserved[16];
+}
 
 /**
  * Apply changes made to the hook database
@@ -71,126 +102,36 @@ hook_error_t hook_Discard(void);
 /**
  * Installs a hook.
  *
- * If @param size is nonzero, a copy of @param hook will be created.
- * As a result, @param hook must be position-independent.
- *
- * If @param size is zero, @param hook will not be copied but used in-place.
- * This is not recommended except for apps, as hooks stored in RAM will
- * become invalid after the program exits.
- *
  * If another hook with the same ID is already installed, the old hook will be
- * replaced with the new one. The old hook's priority will be preserved.
+ * replaced with the new one. The old hook's priority will be preserved. // todo: mixed feelings about this last bit
  *
- * @param id A unique id for the hook. This must be unique among all programs
- * that use this library. You should register your ID on this page:
- * https://github.com/commandblockguy/capnhook/wiki/Hook-ID-Registry
- * @param hook A pointer to the hook to install. If @param size is nonzero,
- * must be position-independent.
- * @param size The size of the hook. If zero, the hook will be used in-place
- * rather than being copied.
- * @param type The hook type determines what type of OS event the hook will
- * trigger on.
- * @param priority Hooks with lower priority values are called prior to hooks
- * with higher priority values.
- * @param description A human-readable description of the hook, up to 255
- * chars in length.
+ * @param info The hook info struct.
  * @return An error code or HOOK_SUCCESS
  */
-hook_error_t hook_Install(uint24_t id, hook_t *hook, size_t size, hook_type_t type, uint8_t priority, const char *description);
+hook_error_t hook_Install(const hook_info *info);
 
 /**
- * Uninstall a hook
+ * Uninstall a hook.
  * @param id The hook ID
  * @return An error code or HOOK_SUCCESS
  */
 hook_error_t hook_Uninstall(uint24_t id);
 
 /**
- * Sets the priority of a hook
+ * Get a hook by its ID.
+ * 
  * @param id The hook ID
- * @param priority Hooks with lower priority values are called prior to hooks
- * with higher priority values.
- * @return An error code or HOOK_SUCCESS
+ * @param info The hook info
  */
-hook_error_t hook_SetPriority(uint24_t id, uint8_t priority);
+hook_error_t hook_Get(uint24_t id, hook_info *info);
 
 /**
- * Enable a hook
- * @param id The hook ID
- * @return An error code or HOOK_SUCCESS
- */
-hook_error_t hook_Enable(uint24_t id);
-
-/**
- * Disable a hook
- * @param id The hook ID
- * @return An error code or HOOK_SUCCESS
- */
-hook_error_t hook_Disable(uint24_t id);
-
-/**
- * Check if a hook is installed
- * @param id The hook ID
- * @param result Set to 1 if the hook is installed, or 0 if it is not
- * @return An error code or HOOK_SUCCESS
- */
-hook_error_t hook_IsInstalled(uint24_t id, bool *result);
-
-/**
- * Get a pointer to a hook
- * @param id The hook ID
- * @param result Set to a pointer to the hook
- * @return An error code or HOOK_SUCCESS
- */
-hook_error_t hook_GetHook(uint24_t id, hook_t **result);
-
-/**
- * Get a hook's type
- * @param id The hook ID
- * @param result Set to the hook's type
- * @return An error code or HOOK_SUCCESS
- */
-hook_error_t hook_GetType(uint24_t id, hook_type_t *result);
-
-/**
- * Get the priority of a hook
- * @param id The hook ID
- * @param result Set to the hook's priority
- * @return An error code or HOOK_SUCCESS
- */
-hook_error_t hook_GetPriority(uint24_t id, uint8_t *result);
-
-/**
- * Check if a hook is enabled
- * @param id The hook ID
- * @param result Set to 1 if the hook is enabled or 0 otherwise
- * @return An error code or HOOK_SUCCESS
- */
-hook_error_t hook_IsEnabled(uint24_t id, bool *result);
-
-/**
- * Get the description of a hook
- * @param id The hook ID
- * @param result Set to a pointer to the hook description
- * @return An error code or HOOK_SUCCESS
- */
-hook_error_t hook_GetDescription(uint24_t id, char **result);
-
-/**
- * Check if a hook is valid.
- * A hook is valid if the first byte is 0x83
- * @param id The hook ID
- * @return HOOK_SUCCESS if hook is valid, HOOK_ERROR_INVALID_USER_HOOK if
- * invalid, or another error
- */
-hook_error_t hook_CheckValidity(uint24_t id);
-
-/**
- * Iterate through all hook IDs one at a time.
+ * Iterate through all hooks one at a time.
  *
- * @param id Set to the current hook ID. Set this to -1 to start searching.
+ * @param info Set info->id to -1 to start scanning for hooks from the
+ * beginning. The info for each hook will be copied into it.
  * @return HOOK_SUCCESS if @param id was set to the next hook ID,
  * HOOK_ERROR_NO_MATCHING_HOOK once all IDs have already been seen, or another
  * error
  */
-hook_error_t hook_Next(uint24_t *id);
+hook_error_t hook_Next(hook_info *info);
